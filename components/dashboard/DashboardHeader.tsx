@@ -39,10 +39,10 @@ export default function DashboardHeader({
           </div>
           <div>
             <h1 className="text-sm font-extrabold tracking-wider uppercase">
-              Integrated Hospital Management System
+              GAVANE HOSPITAL AND RESEARCH CENTRE
             </h1>
             <p className="text-[10px] text-teal-400 font-medium">
-              Gavane Hospital & Research Centre • {roleSubtitle}
+              • {roleSubtitle}
             </p>
           </div>
         </div>

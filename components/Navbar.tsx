@@ -256,7 +256,7 @@ export default function Navbar() {
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-sm sm:text-lg font-black tracking-tight text-slate-900 block leading-tight truncate">
-                  GAVANE<span className="text-teal-600">HOSPITAL</span>
+                  GAVANE <span className="text-teal-600">HOSPITAL</span>
                 </span>
                 <span className="text-[8px] sm:text-[10px] tracking-wider uppercase font-semibold text-slate-500 truncate">
                   Care & Clinical Excellence

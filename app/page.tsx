@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { 
-  ChevronRight, Award, ShieldCheck, HeartPulse, Stethoscope, 
+import {
+  ChevronRight, Award, ShieldCheck, HeartPulse, Stethoscope,
   Phone, Mail, MapPin, Star
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -39,7 +39,7 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative py-14 sm:py-20 text-center px-4 sm:px-6 bg-gradient-to-b from-slate-900 to-slate-950">
         <span className="text-[10px] sm:text-xs uppercase tracking-widest text-cyan-400 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/20 font-bold">
-          Hospital Management System
+          YOUR HEALTH IS OUR PRIORITY
         </span>
         <h1 className="text-3xl sm:text-4xl md:text-6xl font-extrabold text-white mt-4 max-w-4xl mx-auto leading-tight tracking-tight">
           Your Most Trusted Healthcare Partner
