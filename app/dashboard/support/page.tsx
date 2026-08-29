@@ -4,17 +4,17 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 import React, { useState, useEffect, useCallback } from "react";
-import DashboardHeader from "../../../components/dashboard/DashboardHeader";
-import DashboardSidebar, { SidebarModule } from "../../../components/dashboard/DashboardSidebar";
-import MetricsStrip from "../../../components/dashboard/MetricsStrip";
-import { getSharedPatients, saveSharedPatient, SharedPatient } from "../../../lib/sync/patientsSync";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import DashboardSidebar, { SidebarModule } from "@/components/dashboard/DashboardSidebar";
+import MetricsStrip from "@/components/dashboard/MetricsStrip";
+import { getSharedPatients, saveSharedPatient, SharedPatient } from "@/lib/sync/patientsSync";
 import {
   getSharedCertificates,
   saveSharedCertificate,
   deleteSharedCertificate,
   SharedCertificate,
-} from "../../../lib/sync/certificatesSync";
-import { supabase } from "../../../lib/supabase";
+} from "@/lib/sync/certificatesSync";
+import { supabase } from "@/lib/supabase";
 
 const SUPPORT_SIDEBAR_MODULES: SidebarModule[] = [
   { id: "REGISTRATION", label: "PATIENT REGISTRATION", icon: "👤" },

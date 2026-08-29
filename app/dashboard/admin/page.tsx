@@ -1,19 +1,17 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 import React, { useState, useEffect, useCallback } from "react";
-import DashboardHeader from "../../../components/dashboard/DashboardHeader";
-import DashboardSidebar, { SidebarModule } from "../../../components/dashboard/DashboardSidebar";
-import MetricsStrip from "../../../components/dashboard/MetricsStrip";
-import { getSharedPatients, saveSharedPatient, SharedPatient } from "../../../lib/sync/patientsSync";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import DashboardSidebar, { SidebarModule } from "@/components/dashboard/DashboardSidebar";
+import MetricsStrip from "@/components/dashboard/MetricsStrip";
+import { getSharedPatients, saveSharedPatient } from "@/lib/sync/patientsSync";
 import {
   getSharedCertificates,
   saveSharedCertificate,
   deleteSharedCertificate,
-  SharedCertificate,
-} from "../../../lib/sync/certificatesSync";
+} from "@/lib/sync/certificatesSync";
+import { SharedPatient } from "@/types/patient";
+import { SharedCertificate } from "@/types/certificate";
 
 const ADMIN_MODULES: SidebarModule[] = [
   { id: "MASTER", label: "MASTER", icon: "🏢", adminBadge: false },
