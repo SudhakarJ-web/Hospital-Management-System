@@ -11,8 +11,8 @@ import {
   saveSharedCertificate,
   deleteSharedCertificate,
   SharedCertificate,
-} from "../../../lib/sync/certificatesSync";
-import { supabase } from "../../../lib/supabase";
+} from "@/lib/sync/certificatesSync";
+import { supabase } from "@/lib/supabase";
 
 const DOCTOR_SIDEBAR_MODULES: SidebarModule[] = [
   { id: "OPD", label: "OPD CLINICAL DESK", icon: "🩺" },
@@ -157,8 +157,10 @@ const INITIAL_DOCTOR_DOMAIN_DATA: Record<string, DoctorTabRecord[]> = {
 };
 
 export default function DoctorDashboardPage() {
+  // Default Active Module is OPD
   const [activeModule, setActiveModule] = useState<string>("OPD");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   // Doctor session state
   const [doctorName, setDoctorName] = useState<string>("Dr. Priya");
@@ -542,6 +544,7 @@ export default function DoctorDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col font-sans text-slate-800">
+      {/* Header */}
       <DashboardHeader
         roleIcon="🩺"
         loggedAsText={`${doctorName} (${doctorEmail})`}
@@ -549,29 +552,88 @@ export default function DoctorDashboardPage() {
         bannerText="Physician Clinical EHR & Outpatient Operations Workspace"
       />
 
-      <div className="flex flex-1 overflow-hidden">
-        <DashboardSidebar
-          modules={DOCTOR_SIDEBAR_MODULES}
-          activeModule={activeModule}
-          onSelectModule={(id) => {
-            setActiveModule(id);
-            setSearchTerm("");
-          }}
-          sectionTitle="Physician Features"
-        />
+      {/* Mobile Switch Bar */}
+      <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shadow-xs">
+        <div className="flex items-center space-x-2 text-xs font-bold text-white truncate">
+          <span className="text-teal-400">🩺 Active:</span>
+          <span className="uppercase text-teal-300 truncate">
+            {DOCTOR_SIDEBAR_MODULES.find((m) => m.id === activeModule)?.label || activeModule}
+          </span>
+        </div>
+        <button
+          onClick={() => setMobileMenuOpen((prev) => !prev)}
+          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center space-x-1"
+        >
+          <span>{mobileMenuOpen ? "✕ Close" : "☰ Switch Module"}</span>
+        </button>
+      </div>
 
-        <main className="flex-1 p-5 overflow-y-auto space-y-5">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block">
+          <DashboardSidebar
+            modules={DOCTOR_SIDEBAR_MODULES}
+            activeModule={activeModule}
+            onSelectModule={(id) => {
+              setActiveModule(id);
+              setSearchTerm("");
+            }}
+            sectionTitle="Physician Features"
+          />
+        </div>
+
+        {/* Mobile Sidebar Drawer */}
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden flex flex-col bg-slate-950/80 backdrop-blur-sm">
+            <div className="w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-left duration-200">
+              <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                <span className="font-bold text-xs uppercase tracking-wider text-teal-400">Doctor Navigation</span>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 font-bold hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                {DOCTOR_SIDEBAR_MODULES.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      setActiveModule(m.id);
+                      setSearchTerm("");
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                      activeModule === m.id
+                        ? "bg-teal-600 text-white shadow-sm"
+                        : "text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>{m.icon}</span>
+                    <span>{m.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1" onClick={() => setMobileMenuOpen(false)} />
+          </div>
+        )}
+
+        {/* Main Clinical Workspace */}
+        <main className="flex-1 p-3 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 min-w-0">
+          
           {/* Top Control Toolbar */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
-            <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 px-2 py-1">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-500"></span>
-              <span>Active Clinical Ledger: <strong className="text-teal-700 uppercase">{activeModule}</strong></span>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-xs">
+            <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 px-1 py-0.5 min-w-0">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0"></span>
+              <span className="truncate">Active Clinical Ledger: <strong className="text-teal-700 uppercase">{activeModule}</strong></span>
             </div>
 
-            <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
+            <div className="flex items-center space-x-2 w-full sm:w-auto justify-end shrink-0">
               <button
                 onClick={loadDoctorLedgers}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5"
+                className="flex-1 sm:flex-none px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold rounded-lg transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <span>🔄</span>
                 <span>Sync Live Data</span>
@@ -580,7 +642,7 @@ export default function DoctorDashboardPage() {
               {activeModule !== "OPD" && (
                 <button
                   onClick={handleOpenAddModal}
-                  className="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center space-x-1.5"
+                  className="flex-1 sm:flex-none px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
                 >
                   <span>+</span>
                   <span>Add {activeModule === "REGISTRATION" ? "Patient" : activeModule === "CERTIFICATES" ? "Certificate" : `${activeModule} Record`}</span>
@@ -591,27 +653,29 @@ export default function DoctorDashboardPage() {
 
           {/* Feedback Banner */}
           {feedback && (
-            <div className={`p-3 rounded-xl border text-xs font-bold flex justify-between ${
+            <div className={`p-3 rounded-xl border text-xs font-bold flex justify-between items-center ${
               feedback.type === "success" ? "bg-emerald-50 border-emerald-300 text-emerald-900" : "bg-rose-50 border-rose-300 text-rose-900"
             }`}>
               <span>{feedback.text}</span>
-              <button onClick={() => setFeedback(null)} className="font-bold">✕</button>
+              <button onClick={() => setFeedback(null)} className="font-bold px-2 py-0.5">✕</button>
             </div>
           )}
 
           {/* OPD PRIMARY CLINICAL FORM VIEW VS. TAB LEDGERS */}
           {activeModule === "OPD" ? (
-            <DoctorClinicalForm
-              doctorName={doctorName}
-              patients={patients}
-              onSuccess={(msg) => setFeedback({ type: "success", text: msg })}
-              onError={(msg) => setFeedback({ type: "error", text: msg })}
-            />
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 overflow-x-auto">
+              <DoctorClinicalForm
+                doctorName={doctorName}
+                patients={patients}
+                onSuccess={(msg) => setFeedback({ type: "success", text: msg })}
+                onError={(msg) => setFeedback({ type: "error", text: msg })}
+              />
+            </div>
           ) : (
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-100 pb-4">
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-100 pb-4">
                 <div>
-                  <h2 className="text-lg font-black text-slate-900 tracking-tight uppercase">
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase">
                     {activeModule === "REGISTRATION"
                       ? "Patient Registration Ledger"
                       : activeModule === "CERTIFICATES"
@@ -630,7 +694,7 @@ export default function DoctorDashboardPage() {
                     placeholder={`Search in ${activeModule}...`}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                    className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                   />
                 </div>
               </div>
@@ -644,9 +708,9 @@ export default function DoctorDashboardPage() {
                 pendingLabel="Pending Triage / Review"
               />
 
-              {/* Context-Aware Table */}
-              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-                <table className="w-full text-left text-xs text-slate-700">
+              {/* Context-Aware Table with Responsive Horizontal Scroll */}
+              <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-xs">
+                <table className="w-full text-left text-xs text-slate-700 min-w-[750px]">
                   <thead className="bg-[#f8fafc] text-[10px] font-black uppercase text-slate-600 border-b border-slate-200 tracking-wider">
                     <tr>
                       {getTableHeaders().map((h, idx) => (
@@ -669,13 +733,13 @@ export default function DoctorDashboardPage() {
                     ) : (
                       filteredRecords.map((item) => (
                         <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="px-4 py-3.5 font-bold text-teal-700">{item.reference_id}</td>
+                          <td className="px-4 py-3.5 font-bold text-teal-700 whitespace-nowrap">{item.reference_id}</td>
                           <td className="px-4 py-3.5 font-extrabold text-slate-900">{item.col1}</td>
                           <td className="px-4 py-3.5 font-medium text-slate-600">{item.col2}</td>
                           <td className="px-4 py-3.5 font-medium text-slate-700">{item.col3}</td>
                           <td className="px-4 py-3.5 font-medium text-slate-600">{item.col4}</td>
                           <td className="px-4 py-3.5 font-bold text-slate-800">{item.col5}</td>
-                          <td className="px-4 py-3.5">
+                          <td className="px-4 py-3.5 whitespace-nowrap">
                             <span
                               className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                                 item.status === "Active" || item.status === "Completed"
@@ -691,14 +755,14 @@ export default function DoctorDashboardPage() {
                           <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
                             <button
                               onClick={() => handleOpenEditModal(item as DoctorTabRecord)}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
                               title="Edit Record"
                             >
                               ✏️
                             </button>
                             <button
                               onClick={() => handleDeleteEntry(item.id, item.col1)}
-                              className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                              className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors cursor-pointer"
                               title="Delete Record"
                             >
                               🗑️
@@ -715,15 +779,16 @@ export default function DoctorDashboardPage() {
         </main>
       </div>
 
-      <footer className="bg-[#0b1b2b] text-slate-400 px-4 py-2 text-[10px] flex items-center justify-between border-t border-slate-800">
+      {/* Footer */}
+      <footer className="bg-[#0b1b2b] text-slate-400 px-4 py-2 text-[10px] flex flex-col sm:flex-row items-center justify-between border-t border-slate-800 gap-1 text-center sm:text-left">
         <div>Current Session :- <strong className="text-teal-400">{doctorName} ({doctorEmail}) • Pune Node</strong></div>
         <div>Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span></div>
       </footer>
 
       {/* Dynamic Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 sm:p-6 space-y-4 my-auto max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
               <div>
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
@@ -733,7 +798,7 @@ export default function DoctorDashboardPage() {
                   {modalConfig.title}
                 </h3>
               </div>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
             </div>
 
             <form onSubmit={handleSaveModalEntry} className="space-y-3.5">
@@ -749,7 +814,7 @@ export default function DoctorDashboardPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">{modalConfig.l2} *</label>
                   <input
@@ -774,7 +839,7 @@ export default function DoctorDashboardPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">{modalConfig.l4} *</label>
                   <input
@@ -814,12 +879,12 @@ export default function DoctorDashboardPage() {
               </div>
 
               <div className="flex justify-end space-x-2 pt-3 border-t">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-slate-100 text-xs font-bold rounded-lg">
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-slate-100 text-xs font-bold rounded-lg cursor-pointer">
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm"
+                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
                 >
                   {isEditing ? "Save Changes" : `Commit Entry to ${activeModule}`}
                 </button>
