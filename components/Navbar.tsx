@@ -259,7 +259,7 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => {
-                  handleRoleSelection("Doctor");
+                  handleRoleSelection("Admin");
                   setShowStaffModal(true);
                 }}
                 className="inline-flex items-center px-2 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg border border-slate-300 text-slate-700 bg-slate-50 hover:bg-slate-100 transition-all active:scale-95 gap-1 shrink-0 cursor-pointer"
@@ -369,11 +369,10 @@ export default function Navbar() {
                     key={roleItem.id}
                     type="button"
                     onClick={() => handleRoleSelection(roleItem.id as StaffRole)}
-                    className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-center transition-all ${
-                      isSelected
+                    className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-center transition-all ${isSelected
                         ? "border-teal-600 bg-teal-50 text-teal-900 font-bold shadow-xs ring-1 ring-teal-600"
                         : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-medium"
-                    }`}
+                      }`}
                   >
                     <span className="text-sm mb-0.5">{roleItem.icon}</span>
                     <span className="text-[10px]">{roleItem.label}</span>
@@ -455,18 +454,16 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => setPatientMode("login")}
-                className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
-                  patientMode === "login" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"
-                }`}
+                className={`py-1.5 text-xs font-bold rounded-lg transition-all ${patientMode === "login" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"
+                  }`}
               >
                 Sign In
               </button>
               <button
                 type="button"
                 onClick={() => setPatientMode("register")}
-                className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
-                  patientMode === "register" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"
-                }`}
+                className={`py-1.5 text-xs font-bold rounded-lg transition-all ${patientMode === "register" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"
+                  }`}
               >
                 Create Account
               </button>
@@ -551,8 +548,8 @@ export default function Navbar() {
                 {patientLoading
                   ? "Processing..."
                   : patientMode === "login"
-                  ? "Open Patient Vault"
-                  : "Complete Registration"}
+                    ? "Open Patient Vault"
+                    : "Complete Registration"}
               </button>
             </form>
           </div>
