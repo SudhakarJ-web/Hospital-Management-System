@@ -27,6 +27,9 @@ const ROLE_PRESETS: Record<StaffRole, { email: string; pass: string; route: stri
 export default function Navbar() {
   const router = useRouter();
 
+  // Mobile Navigation State
+  const [mobileNavOpen, setMobileNavOpen] = useState<boolean>(false);
+
   // Modal States
   const [showStaffModal, setShowStaffModal] = useState<boolean>(false);
   const [showPatientModal, setShowPatientModal] = useState<boolean>(false);
@@ -72,7 +75,7 @@ export default function Navbar() {
     const inputId = staffIdentifier.trim().toLowerCase();
     const inputPass = staffPassword;
 
-    // 1. Check local directory cache for newly created personnel (e.g. Dr. Priya)
+    // 1. Check local directory cache for newly created personnel
     let localDirectory: StoredStaff[] = [];
     try {
       const stored = localStorage.getItem("gavane_staff_registry");
@@ -101,7 +104,6 @@ export default function Navbar() {
         return;
       }
 
-      // Successful verification
       setShowStaffModal(false);
       setStaffLoading(false);
       router.push(getTargetRouteByRole(matchedStaff.module_category));
@@ -110,7 +112,7 @@ export default function Navbar() {
 
     // 2. Authenticate via Supabase Auth
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data } = await supabase.auth.signInWithPassword({
         email: inputId,
         password: inputPass,
       });
@@ -143,7 +145,6 @@ export default function Navbar() {
         return;
       }
 
-      // Any active doctor/staff login fallback resolution
       setShowStaffModal(false);
       setStaffLoading(false);
       router.push(ROLE_PRESETS[selectedStaffRole].route);
@@ -222,84 +223,139 @@ export default function Navbar() {
   return (
     <>
       {/* Top Banner */}
-      <div className="bg-[#0b1b2b] text-slate-300 text-[11px] px-4 py-1.5 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center space-x-4">
-            <span>📞 Emergency 24/7: <strong className="text-white">+91 0240 2484 888</strong></span>
+      <div className="bg-[#0b1b2b] text-slate-300 text-[10px] sm:text-[11px] px-3 sm:px-4 py-1.5 border-b border-slate-800">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 text-center sm:text-left">
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-0.5">
+            <span>
+              📞 Emergency 24/7:{" "}
+              <a href="tel:+9102402484888" className="text-white font-bold hover:text-teal-400">
+                +91 0240 2484 888
+              </a>
+            </span>
             <span className="hidden md:inline">✉️ contact@gavanehospital.in</span>
             <span className="hidden lg:inline">📍 Gavane Hospital Rd, Pune, Maharashtra</span>
           </div>
-          <div className="flex items-center space-x-2 text-teal-400 font-semibold">
-            <span>🛡️ DPDP Act 2023 & DISHA Compliant Node (ap-south-1)</span>
+          <div className="flex items-center justify-center space-x-1.5 text-teal-400 font-semibold text-[9px] sm:text-[10px]">
+            <span>🛡️</span>
+            <span>DPDP Act 2023 & DISHA Compliant Node (ap-south-1)</span>
           </div>
         </div>
       </div>
 
       {/* Main Navbar */}
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-14 sm:h-16 items-center gap-1.5">
             
-            <Link href="/" className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center text-white font-bold shadow-md">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {/* Logo & Hospital Name */}
+            <Link href="/" className="flex items-center space-x-2 sm:space-x-3 shrink-0 min-w-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-teal-600 flex items-center justify-center text-white font-bold shadow-md shrink-0">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
                 </svg>
               </div>
-              <div>
-                <span className="text-lg font-black tracking-tight text-slate-900 block leading-none">
+              <div className="flex flex-col min-w-0">
+                <span className="text-sm sm:text-lg font-black tracking-tight text-slate-900 block leading-tight truncate">
                   GAVANE<span className="text-teal-600">HOSPITAL</span>
                 </span>
-                <span className="text-[10px] tracking-wider uppercase font-semibold text-slate-500">
+                <span className="text-[8px] sm:text-[10px] tracking-wider uppercase font-semibold text-slate-500 truncate">
                   Care & Clinical Excellence
                 </span>
               </div>
             </Link>
 
-            <div className="hidden md:flex items-center space-x-6 text-xs font-bold uppercase tracking-wider text-slate-600">
+            {/* Desktop Navigation Links */}
+            <div className="hidden lg:flex items-center space-x-6 text-xs font-bold uppercase tracking-wider text-slate-600">
               <Link href="/" className="hover:text-teal-600 transition-colors">Home</Link>
               <Link href="/about" className="hover:text-teal-600 transition-colors">About Us</Link>
               <Link href="/contact" className="hover:text-teal-600 transition-colors">Emergency & Contact</Link>
             </div>
 
-            <div className="flex items-center space-x-3">
+            {/* Action Buttons & Mobile Hamburger */}
+            <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
+              {/* Staff Portal */}
               <button
                 type="button"
                 onClick={() => {
                   handleRoleSelection("Doctor");
                   setShowStaffModal(true);
                 }}
-                className="inline-flex items-center px-3.5 py-2 text-xs font-bold rounded-lg border border-slate-300 text-slate-700 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 transition-all shadow-2xs gap-1.5"
+                className="inline-flex items-center px-2 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg border border-slate-300 text-slate-700 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-95 gap-1 shrink-0 cursor-pointer"
               >
                 <span>🔒</span>
-                <span>Staff Portal</span>
+                <span className="whitespace-nowrap">Staff Portal</span>
               </button>
 
+              {/* Patient Portal */}
               <button
                 type="button"
                 onClick={() => {
                   setPatientMode("login");
                   setShowPatientModal(true);
                 }}
-                className="inline-flex items-center px-4 py-2 text-xs font-bold rounded-lg text-white bg-teal-600 hover:bg-teal-700 transition-all shadow-sm gap-1.5"
+                className="inline-flex items-center px-2.5 py-1.5 sm:px-3.5 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg text-white bg-teal-600 hover:bg-teal-700 transition-all active:scale-95 gap-1 shrink-0 shadow-xs cursor-pointer"
               >
                 <span>👤</span>
-                <span>Patient Portal</span>
+                <span className="whitespace-nowrap">Patient Portal</span>
+              </button>
+
+              {/* Mobile Hamburger Toggle */}
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen((prev) => !prev)}
+                className="lg:hidden p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
+                aria-label="Toggle Navigation Menu"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {mobileNavOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
               </button>
             </div>
 
           </div>
         </div>
+
+        {/* Collapsible Mobile Navigation Drawer */}
+        {mobileNavOpen && (
+          <div className="lg:hidden border-t border-slate-200 bg-slate-50 px-4 py-3 space-y-2">
+            <Link
+              href="/"
+              onClick={() => setMobileNavOpen(false)}
+              className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1"
+            >
+              Home
+            </Link>
+            <Link
+              href="/about"
+              onClick={() => setMobileNavOpen(false)}
+              className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1"
+            >
+              About Us
+            </Link>
+            <Link
+              href="/contact"
+              onClick={() => setMobileNavOpen(false)}
+              className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1"
+            >
+              Emergency & Contact
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* Staff 4-Role Modal */}
       {showStaffModal && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 sm:p-7 space-y-5 relative">
+        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-5 sm:p-7 space-y-4 sm:space-y-5 relative my-auto">
             
             <button
               onClick={() => setShowStaffModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-base font-bold w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors"
+              type="button"
+              className="absolute top-3.5 right-3.5 text-slate-400 hover:text-slate-600 text-sm font-bold w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors"
             >
               ✕
             </button>
@@ -310,12 +366,12 @@ export default function Navbar() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
-              <h2 className="text-lg font-black text-slate-900 tracking-tight">Hospital Management System</h2>
+              <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">Hospital Management System</h2>
               <p className="text-xs text-slate-500">Gavane Hospital Role-Based Gateway</p>
             </div>
 
-            {/* 4-Role Tab Bar */}
-            <div className="grid grid-cols-4 gap-2">
+            {/* 4-Role Tab Bar: 2x2 Grid on Mobile, 4-Cols on Desktop */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
                 { id: "Admin", label: "Admin", icon: "🔑" },
                 { id: "Doctor", label: "Doctor", icon: "🩺" },
@@ -328,9 +384,9 @@ export default function Navbar() {
                     key={roleItem.id}
                     type="button"
                     onClick={() => handleRoleSelection(roleItem.id as StaffRole)}
-                    className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl border text-center transition-all ${
+                    className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-center transition-all ${
                       isSelected
-                        ? "border-blue-600 bg-blue-50/50 text-blue-900 font-bold shadow-xs ring-1 ring-blue-600"
+                        ? "border-blue-600 bg-blue-50/70 text-blue-900 font-bold shadow-xs ring-1 ring-blue-600"
                         : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-medium"
                     }`}
                   >
@@ -342,12 +398,12 @@ export default function Navbar() {
             </div>
 
             {staffError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-lg font-medium text-center">
+              <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-lg font-medium text-center">
                 {staffError}
               </div>
             )}
 
-            <form onSubmit={handleStaffLogin} className="space-y-3.5">
+            <form onSubmit={handleStaffLogin} className="space-y-3">
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Registered {selectedStaffRole} Email or Username
@@ -379,7 +435,7 @@ export default function Navbar() {
               <button
                 type="submit"
                 disabled={staffLoading}
-                className="w-full py-2.5 bg-[#0b1b2b] hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider rounded-lg shadow-md transition-all flex items-center justify-center gap-2 mt-2"
+                className="w-full py-2.5 bg-[#0b1b2b] hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider rounded-lg shadow-md transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
               >
                 {staffLoading ? "Authenticating..." : `Authenticate ${selectedStaffRole} Access`}
               </button>
@@ -394,12 +450,13 @@ export default function Navbar() {
 
       {/* Patient Login & Pre-Registration Modal */}
       {showPatientModal && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 sm:p-7 space-y-5 relative">
+        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-5 sm:p-7 space-y-4 sm:space-y-5 relative my-auto">
             
             <button
               onClick={() => setShowPatientModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-base font-bold w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors"
+              type="button"
+              className="absolute top-3.5 right-3.5 text-slate-400 hover:text-slate-600 text-sm font-bold w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors"
             >
               ✕
             </button>
@@ -408,7 +465,7 @@ export default function Navbar() {
               <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-teal-50 text-teal-600 border border-teal-200 mb-1">
                 👤
               </div>
-              <h2 className="text-lg font-black text-slate-900 tracking-tight">
+              <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
                 {patientMode === "login" ? "Patient Vault Login" : "New Patient Pre-Registration"}
               </h2>
               <p className="text-xs text-slate-500">
@@ -450,12 +507,12 @@ export default function Navbar() {
             </div>
 
             {patientError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-lg font-medium text-center">
+              <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-lg font-medium text-center">
                 {patientError}
               </div>
             )}
             {patientSuccess && (
-              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg font-medium text-center">
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg font-medium text-center">
                 {patientSuccess}
               </div>
             )}
@@ -477,7 +534,7 @@ export default function Navbar() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
                         Phone Number *
@@ -538,7 +595,7 @@ export default function Navbar() {
               <button
                 type="submit"
                 disabled={patientLoading}
-                className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider rounded-lg shadow-md transition-all flex items-center justify-center gap-2 mt-2"
+                className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider rounded-lg shadow-md transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
               >
                 {patientLoading
                   ? "Processing..."
