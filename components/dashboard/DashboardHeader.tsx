@@ -1,73 +1,89 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 
 interface DashboardHeaderProps {
-  roleIcon: string;
+  roleIcon?: string;
   loggedAsText: string;
   roleSubtitle?: string;
-  bannerText: string;
+  bannerText?: string;
 }
 
 export default function DashboardHeader({
-  roleIcon,
+  roleIcon = "🏥",
   loggedAsText,
-  roleSubtitle = "Medical Staff Portal",
-  bannerText,
+  roleSubtitle = "Clinical & Administrative Node",
+  bannerText = "Gavane Hospital Management System",
 }: DashboardHeaderProps) {
   const router = useRouter();
 
-  const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch {
-      // Offline fallback
-    }
+  const handleExit = () => {
     router.push("/");
   };
 
   return (
-    <>
-      <header className="bg-[#0b1b2b] text-white px-4 py-2.5 flex items-center justify-between shadow-md border-b border-slate-800">
-        <div className="flex items-center space-x-3">
-          <div className="bg-teal-500 text-slate-950 p-1.5 rounded-lg flex items-center justify-center font-bold">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-sm font-extrabold tracking-wider uppercase">
-              GAVANE HOSPITAL AND RESEARCH CENTRE
-            </h1>
-            <p className="text-[10px] text-teal-400 font-medium">
-              • {roleSubtitle}
-            </p>
-          </div>
+    <header className="bg-[#0b1b2b] text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
+      {/* Top Main Navigation Row */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+        
+        {/* Brand Logo & Name */}
+        <div className="flex items-center space-x-2.5 w-full sm:w-auto justify-between sm:justify-start">
+          <Link href="/" className="flex items-center space-x-2.5 group min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-400 font-bold shrink-0 shadow-inner">
+              ⚡
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="font-extrabold text-xs sm:text-sm tracking-tight text-white uppercase leading-tight truncate">
+                GAVANE HOSPITAL AND RESEARCH CENTRE
+              </span>
+              <span className="text-[9px] sm:text-[10px] text-teal-400 font-medium tracking-wide truncate">
+                • {roleSubtitle}
+              </span>
+            </div>
+          </Link>
+
+          {/* Mobile-Only Close/Exit Button */}
+          <button
+            onClick={handleExit}
+            type="button"
+            className="sm:hidden px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] rounded-lg transition-colors shrink-0 shadow-xs flex items-center space-x-1"
+          >
+            <span>🚪</span>
+            <span>Exit</span>
+          </button>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <div className="bg-[#12283e] border border-teal-500/40 px-3 py-1 rounded-md text-xs flex items-center space-x-2">
-            <span className="text-teal-400 font-bold">{roleIcon}</span>
-            <span className="text-slate-300">
+        {/* User Identity Badge & Desktop Exit Button */}
+        <div className="flex items-center justify-between sm:justify-end space-x-2 w-full sm:w-auto">
+          <div className="flex items-center space-x-1.5 bg-[#07131e] border border-teal-500/30 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg text-[10px] sm:text-xs text-slate-300 font-medium max-w-[280px] sm:max-w-none truncate">
+            <span className="text-teal-400 shrink-0">{roleIcon}</span>
+            <span className="truncate">
               Logged as: <strong className="text-white">{loggedAsText}</strong>
             </span>
           </div>
 
           <button
-            onClick={handleSignOut}
-            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-sm"
+            onClick={handleExit}
+            type="button"
+            className="hidden sm:inline-flex items-center space-x-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-colors shadow-xs shrink-0 cursor-pointer"
           >
             <span>🚪</span>
             <span>Close / Exit</span>
           </button>
         </div>
-      </header>
 
-      <div className="bg-[#18314a] text-teal-300 py-1 px-4 text-center text-xs font-bold uppercase tracking-widest border-b border-[#0f2234]">
-        {bannerText}
       </div>
-    </>
+
+      {/* Sub-Header Operational Banner */}
+      {bannerText && (
+        <div className="bg-[#050e17] border-t border-slate-800/80 py-1 px-3 text-center">
+          <p className="text-[9px] sm:text-[11px] font-bold text-teal-400 tracking-wider uppercase truncate">
+            {bannerText}
+          </p>
+        </div>
+      )}
+    </header>
   );
 }
