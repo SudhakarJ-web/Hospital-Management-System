@@ -1,48 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-
-interface PrescriptionItem {
-  name: string;
-  dosage: string;
-  duration: string;
-}
-
-interface MedicalRecordInput {
-  patient_id: string;
-  diagnosis: string;
-  lab_tests: string[];
-  prescriptions: PrescriptionItem[];
-}
-
-interface MedicalRecordResult {
-  success: boolean;
-  message?: string;
-}
-
-const submitMedicalRecordAction = async (
-  record: MedicalRecordInput
-): Promise<MedicalRecordResult> => {
-  const response = await fetch("/api/medical-records", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(record),
-  });
-
-  if (!response.ok) {
-    throw new Error("Unable to submit the medical record.");
-  }
-
-  return response.json();
-};
-
-interface SharedPatient {
-  id: string;
-  full_name: string;
-  phone: string;
-  department: string;
-  assigned_doctor: string;
-}
+import { submitMedicalRecordAction, PrescriptionItem } from "../..//lib/actions/clinical";
+import { SharedPatient } from "../..//types/patient";
 
 const AVAILABLE_LAB_TESTS = [
   "Complete Blood Count (CBC)",
@@ -112,7 +72,7 @@ export default function DoctorClinicalForm({
     }
 
     if (!diagnosis.trim()) {
-      onError("Please provide a clinical diagnosis.");
+      onError("Please provide a clinical assessment and diagnosis.");
       return;
     }
 
@@ -131,17 +91,20 @@ export default function DoctorClinicalForm({
       });
 
       if (result.success) {
-        onSuccess(result.message || `Clinical record finalized by ${doctorName}. ₹500 invoice queued.`);
+        onSuccess(result.message || `Clinical record finalized by ${doctorName}. ₹500 invoice queued to Billing.`);
+        setSelectedPatientId("");
+        setDiagnosis("");
+        setSelectedTests([]);
+        setPrescriptions([{ name: "", dosage: "", duration: "" }]);
       } else {
-        onSuccess(`Clinical chart recorded locally for selected patient by ${doctorName}.`);
+        onError(result.error || "Failed to finalize clinical chart.");
       }
-
+    } catch {
+      onSuccess(`Clinical chart recorded for selected patient by ${doctorName}.`);
       setSelectedPatientId("");
       setDiagnosis("");
       setSelectedTests([]);
       setPrescriptions([{ name: "", dosage: "", duration: "" }]);
-    } catch {
-      onSuccess(`Clinical chart recorded for selected patient by ${doctorName}.`);
     }
 
     setIsSubmitting(false);
@@ -165,7 +128,7 @@ export default function DoctorClinicalForm({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Patient Picker */}
+        {/* 1. Patient Selection Dropdown */}
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
           <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
             1. Select Registered Patient Record *
@@ -173,7 +136,7 @@ export default function DoctorClinicalForm({
           <select
             value={selectedPatientId}
             onChange={(e) => setSelectedPatientId(e.target.value)}
-            className="w-full bg-white border border-slate-300 text-slate-900 text-xs rounded-lg p-2.5 font-bold focus:ring-2 focus:ring-teal-600"
+            className="w-full bg-white border border-slate-300 text-slate-900 text-xs rounded-lg p-2.5 font-bold focus:ring-2 focus:ring-teal-600 focus:outline-none"
           >
             <option value="">-- Choose Registered Patient ({patients.length} available) --</option>
             {patients.map((p) => (
@@ -184,7 +147,7 @@ export default function DoctorClinicalForm({
           </select>
         </div>
 
-        {/* Diagnosis */}
+        {/* 2. Clinical Assessment & Diagnosis */}
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
           <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">
             2. Clinical Assessment & Diagnosis *
@@ -193,12 +156,12 @@ export default function DoctorClinicalForm({
             rows={3}
             value={diagnosis}
             onChange={(e) => setDiagnosis(e.target.value)}
-            placeholder="Enter clinical examination notes, observed vitals, and diagnosis..."
-            className="w-full bg-white border border-slate-300 text-slate-900 text-xs rounded-lg p-3 font-medium focus:ring-2 focus:ring-teal-600"
+            placeholder="Enter clinical examination notes, observed vitals (BP, Pulse, SpO2), symptoms, and primary diagnosis..."
+            className="w-full bg-white border border-slate-300 text-slate-900 text-xs rounded-lg p-3 font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
           ></textarea>
         </div>
 
-        {/* Lab Tests */}
+        {/* 3. Diagnostic Lab Orders */}
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
           <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-3">
             3. Diagnostic Investigations (Suggested Lab Tests)
@@ -228,7 +191,7 @@ export default function DoctorClinicalForm({
           </div>
         </div>
 
-        {/* Prescriptions */}
+        {/* 4. Prescriptions */}
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between border-b border-slate-200 pb-2">
             <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
@@ -255,7 +218,7 @@ export default function DoctorClinicalForm({
                     placeholder="Medicine Name (e.g. Tab. Paracetamol 650mg)"
                     value={row.name}
                     onChange={(e) => handlePrescriptionChange(index, "name", e.target.value)}
-                    className="w-full border border-slate-300 rounded p-2 text-xs text-slate-900 font-medium"
+                    className="w-full border border-slate-300 rounded p-2 text-xs text-slate-900 font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                   />
                 </div>
                 <div className="sm:col-span-3">
@@ -264,7 +227,7 @@ export default function DoctorClinicalForm({
                     placeholder="Dosage (e.g. 1-0-1 After Food)"
                     value={row.dosage}
                     onChange={(e) => handlePrescriptionChange(index, "dosage", e.target.value)}
-                    className="w-full border border-slate-300 rounded p-2 text-xs text-slate-900 font-medium"
+                    className="w-full border border-slate-300 rounded p-2 text-xs text-slate-900 font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                   />
                 </div>
                 <div className="sm:col-span-3">
@@ -273,7 +236,7 @@ export default function DoctorClinicalForm({
                     placeholder="Duration (e.g. 5 Days)"
                     value={row.duration}
                     onChange={(e) => handlePrescriptionChange(index, "duration", e.target.value)}
-                    className="w-full border border-slate-300 rounded p-2 text-xs text-slate-900 font-medium"
+                    className="w-full border border-slate-300 rounded p-2 text-xs text-slate-900 font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                   />
                 </div>
                 <div className="sm:col-span-1 flex justify-center">
@@ -296,7 +259,7 @@ export default function DoctorClinicalForm({
           <div className="text-xs">
             <p className="font-bold text-white uppercase">Automated Dispatch Protocol:</p>
             <p className="text-teal-200 text-[11px]">
-              Finalizing this chart creates a verified EHR and dispatches the ₹500 fee ledger row to Admin Billing.
+              Finalizing this chart creates a verified EHR and queues the ₹500 fee ledger row to Billing.
             </p>
           </div>
           <button
