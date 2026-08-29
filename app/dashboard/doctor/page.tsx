@@ -1,5 +1,8 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import React, { useState, useEffect, useCallback } from "react";
 import DashboardHeader from "../../../components/dashboard/DashboardHeader";
 import DashboardSidebar, { SidebarModule } from "../../../components/dashboard/DashboardSidebar";
