@@ -142,6 +142,7 @@ const INITIAL_PATIENT_RECORDS: Record<string, PatientPortalRecord[]> = {
 export default function PatientDashboardPage() {
   const [activeModule, setActiveModule] = useState<string>("APPOINTMENTS");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   // Patient Identity Session
   const [patientName, setPatientName] = useState<string>("Sagar Jadhav");
@@ -246,7 +247,6 @@ export default function PatientDashboardPage() {
   }[] = [];
 
   if (activeModule === "CERTIFICATES") {
-    // Show all universally synchronized certificates issued for this patient
     currentRecords = certificates.map((c) => ({
       id: c.id,
       reference_id: c.reference_id,
@@ -277,6 +277,7 @@ export default function PatientDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col font-sans text-slate-800">
+      {/* Responsive Header */}
       <DashboardHeader
         roleIcon="👤"
         loggedAsText={`${patientName} (${patientEmail})`}
@@ -284,34 +285,93 @@ export default function PatientDashboardPage() {
         bannerText="Personal Health Records, Electronic Prescriptions & Digital Care Gateway"
       />
 
-      <div className="flex flex-1 overflow-hidden">
-        <DashboardSidebar
-          modules={PATIENT_SIDEBAR_MODULES}
-          activeModule={activeModule}
-          onSelectModule={(id) => {
-            setActiveModule(id);
-            setSearchTerm("");
-          }}
-          sectionTitle="Patient Workspace"
-        />
+      {/* Mobile Switch Bar */}
+      <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shadow-xs">
+        <div className="flex items-center space-x-2 text-xs font-bold text-white truncate">
+          <span className="text-teal-400">👤 Workspace:</span>
+          <span className="uppercase text-teal-300 truncate">
+            {PATIENT_SIDEBAR_MODULES.find((m) => m.id === activeModule)?.label || activeModule}
+          </span>
+        </div>
+        <button
+          onClick={() => setMobileMenuOpen((prev) => !prev)}
+          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center space-x-1"
+        >
+          <span>{mobileMenuOpen ? "✕ Close" : "☰ Switch Section"}</span>
+        </button>
+      </div>
 
-        <main className="flex-1 p-5 overflow-y-auto space-y-5">
-          {/* Patient Info Card */}
-          <div className="bg-gradient-to-r from-teal-800 to-slate-900 text-white p-5 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-teal-300 bg-white/10 px-2.5 py-1 rounded-md">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block">
+          <DashboardSidebar
+            modules={PATIENT_SIDEBAR_MODULES}
+            activeModule={activeModule}
+            onSelectModule={(id) => {
+              setActiveModule(id);
+              setSearchTerm("");
+            }}
+            sectionTitle="Patient Workspace"
+          />
+        </div>
+
+        {/* Mobile Sidebar Drawer */}
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden flex flex-col bg-slate-950/80 backdrop-blur-sm">
+            <div className="w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-left duration-200">
+              <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                <span className="font-bold text-xs uppercase tracking-wider text-teal-400">Health Portal Menu</span>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 font-bold hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                {PATIENT_SIDEBAR_MODULES.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      setActiveModule(m.id);
+                      setSearchTerm("");
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                      activeModule === m.id
+                        ? "bg-teal-600 text-white shadow-sm"
+                        : "text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>{m.icon}</span>
+                    <span className="truncate">{m.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1" onClick={() => setMobileMenuOpen(false)} />
+          </div>
+        )}
+
+        {/* Main Portal Content Workspace */}
+        <main className="flex-1 p-3 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 min-w-0">
+          
+          {/* Patient Info / ABHA Identity Card */}
+          <div className="bg-gradient-to-r from-teal-800 to-slate-900 text-white p-4 sm:p-5 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="min-w-0">
+              <span className="text-[9.5px] sm:text-[10px] font-extrabold uppercase tracking-widest text-teal-300 bg-white/10 px-2.5 py-1 rounded-md">
                 Verified Citizen Health ID • ABHA Integrated
               </span>
-              <h1 className="text-xl font-black mt-2 tracking-tight">{patientName}</h1>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Primary Contact: <span className="font-semibold text-white">{patientPhone}</span> • Email: <span className="font-semibold text-white">{patientEmail}</span>
+              <h1 className="text-lg sm:text-xl font-black mt-2 tracking-tight truncate">{patientName}</h1>
+              <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 leading-relaxed">
+                Contact: <span className="font-semibold text-white">{patientPhone}</span> • Email: <span className="font-semibold text-white">{patientEmail}</span>
               </p>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 w-full md:w-auto justify-end shrink-0">
               <button
                 onClick={loadPatientData}
-                className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5"
+                className="w-full md:w-auto px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-bold rounded-lg transition-colors flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs"
               >
                 <span>🔄</span>
                 <span>Sync Health Data</span>
@@ -320,10 +380,10 @@ export default function PatientDashboardPage() {
           </div>
 
           {/* Master Display Container */}
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
-                <h2 className="text-lg font-black text-slate-900 tracking-tight uppercase">
+                <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase">
                   {activeModule.replace(/_/g, " ")} OVERVIEW
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5 font-medium">
@@ -338,7 +398,7 @@ export default function PatientDashboardPage() {
                   placeholder={`Search in ${activeModule.replace(/_/g, " ")}...`}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                  className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                 />
               </div>
             </div>
@@ -352,9 +412,9 @@ export default function PatientDashboardPage() {
               pendingLabel="Pending Review"
             />
 
-            {/* Records Data Table */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-              <table className="w-full text-left text-xs text-slate-700">
+            {/* Records Data Table with Responsive Horizontal Scroll */}
+            <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-xs">
+              <table className="w-full text-left text-xs text-slate-700 min-w-[750px]">
                 <thead className="bg-[#f8fafc] text-[10px] font-black uppercase text-slate-600 border-b border-slate-200 tracking-wider">
                   <tr>
                     {getTableHeaders().map((h, idx) => (
@@ -374,13 +434,13 @@ export default function PatientDashboardPage() {
                   ) : (
                     filteredRecords.map((item) => (
                       <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-4 py-3.5 font-bold text-teal-700">{item.reference_id}</td>
+                        <td className="px-4 py-3.5 font-bold text-teal-700 whitespace-nowrap">{item.reference_id}</td>
                         <td className="px-4 py-3.5 font-extrabold text-slate-900">{item.col1}</td>
                         <td className="px-4 py-3.5 font-medium text-slate-600">{item.col2}</td>
                         <td className="px-4 py-3.5 font-medium text-slate-700">{item.col3}</td>
                         <td className="px-4 py-3.5 font-bold text-slate-800">{item.col4}</td>
                         <td className="px-4 py-3.5 font-medium text-slate-600">{item.col5}</td>
-                        <td className="px-4 py-3.5">
+                        <td className="px-4 py-3.5 whitespace-nowrap">
                           <span
                             className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                               item.status === "Active" || item.status === "Completed"
@@ -403,7 +463,8 @@ export default function PatientDashboardPage() {
         </main>
       </div>
 
-      <footer className="bg-[#0b1b2b] text-slate-400 px-4 py-2 text-[10px] flex items-center justify-between border-t border-slate-800">
+      {/* Sticky Bottom Status Footer */}
+      <footer className="bg-[#0b1b2b] text-slate-400 px-4 py-2 text-[10px] flex flex-col sm:flex-row items-center justify-between border-t border-slate-800 gap-1 text-center sm:text-left">
         <div>Current User :- <strong className="text-teal-400">{patientName} ({patientEmail}) • Patient Gateway</strong></div>
         <div>Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span></div>
       </footer>
