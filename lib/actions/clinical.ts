@@ -1,6 +1,6 @@
 "use server";
 
-import { supabase } from "../../lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
 
 export interface PrescriptionItem {

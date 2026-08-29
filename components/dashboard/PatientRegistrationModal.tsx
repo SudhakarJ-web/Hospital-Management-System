@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { SharedPatient, saveSharedPatient } from "../../lib/sync/patientsSync";
+import { SharedPatient, saveSharedPatient } from "@/lib/sync/patientsSync";
 
 interface PatientRegistrationModalProps {
   isOpen: boolean;

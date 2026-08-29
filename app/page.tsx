@@ -7,7 +7,7 @@ import {
   ChevronRight, Award, ShieldCheck, HeartPulse, Stethoscope, 
   UserCheck, Phone, Mail, MapPin, Briefcase, Calendar, Star, Building
 } from "lucide-react";
-import Navbar from "../components/Navbar";
+import Navbar from "@/components/Navbar";
 
 export default function HomePage() {
   const [isMounted, setIsMounted] = useState(false);

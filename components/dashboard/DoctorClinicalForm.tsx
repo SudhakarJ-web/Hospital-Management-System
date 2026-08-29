@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { submitMedicalRecordAction, PrescriptionItem } from "../..//lib/actions/clinical";
-import { SharedPatient } from "../..//types/patient";
+import { submitMedicalRecordAction, PrescriptionItem } from "@//lib/actions/clinical";
+import { SharedPatient } from "@//types/patient";
 
 const AVAILABLE_LAB_TESTS = [
   "Complete Blood Count (CBC)",
