@@ -46,6 +46,56 @@ export interface UnifiedRecord {
 }
 
 const INITIAL_DOMAIN_DATA: Record<string, UnifiedRecord[]> = {
+  MASTER: [
+    {
+      id: "mst-1",
+      reference_id: "GH-MST-001",
+      category: "MASTER",
+      col1: "Cardiology & Cardiac Sciences",
+      col2: "Head: Dr. Ananya Rao",
+      col3: "Building A • Floor 3",
+      col4: "24 Beds Active • 4 CCU",
+      col5: "₹500 Base OPD",
+      status: "Active",
+      created_at: "27/08/2026",
+    },
+    {
+      id: "mst-2",
+      reference_id: "GH-MST-002",
+      category: "MASTER",
+      col1: "Trauma & Emergency Care Unit",
+      col2: "Head: Dr. Sudhir Gavane",
+      col3: "Ground Floor Triage",
+      col4: "12 Acute Bays • 2 Resus",
+      col5: "24/7 Dedicated Team",
+      status: "Active",
+      created_at: "27/08/2026",
+    },
+    {
+      id: "mst-3",
+      reference_id: "GH-MST-003",
+      category: "MASTER",
+      col1: "Pediatrics & Neonatal Care",
+      col2: "Head: Dr. Priya",
+      col3: "Building B • Floor 2",
+      col4: "18 Beds • 6 NICU Bays",
+      col5: "₹500 Base OPD",
+      status: "Active",
+      created_at: "27/08/2026",
+    },
+    {
+      id: "mst-4",
+      reference_id: "GH-MST-004",
+      category: "MASTER",
+      col1: "Central Diagnostic Pathology Lab",
+      col2: "In-Charge: Kiran Deshmukh",
+      col3: "Building A • Basement 1",
+      col4: "NABL Certified Node",
+      col5: "High-Throughput CBC/Bio",
+      status: "Active",
+      created_at: "27/08/2026",
+    },
+  ],
   Doctors: [
     {
       id: "doc-1",
@@ -238,6 +288,7 @@ const INITIAL_DOMAIN_DATA: Record<string, UnifiedRecord[]> = {
       created_at: "28/08/2026",
     },
   ],
+  Certificates: [],
   Backup: [
     {
       id: "bk-1",
@@ -255,19 +306,21 @@ const INITIAL_DOMAIN_DATA: Record<string, UnifiedRecord[]> = {
 };
 
 export default function AdminDashboardPage() {
-  const [activeModule, setActiveModule] = useState<string>("Certificates");
+  // 1. DEFAULT ACTIVE MODULE IS NOW MASTER
+  const [activeModule, setActiveModule] = useState<string>("MASTER");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [dataStore, setDataStore] = useState<Record<string, UnifiedRecord[]>>(INITIAL_DOMAIN_DATA);
   const [sharedPatients, setSharedPatients] = useState<SharedPatient[]>([]);
   const [sharedCertificates, setSharedCertificates] = useState<SharedCertificate[]>([]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Dynamic Context-Aware Modal State
+  // Modal States
   const [showModal, setShowModal] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editTargetId, setEditTargetId] = useState<string | null>(null);
 
-  // Dynamic Form Field State
+  // Form Fields State
   const [formCol1, setFormCol1] = useState("");
   const [formCol2, setFormCol2] = useState("");
   const [formCol3, setFormCol3] = useState("");
@@ -312,6 +365,8 @@ export default function AdminDashboardPage() {
   // Table Headers
   const getTableHeaders = () => {
     switch (activeModule) {
+      case "MASTER":
+        return ["Ref ID", "Department / Module", "Clinical Head", "Campus Unit / Location", "Capacity & Scope", "Base Tarif / Key Spec", "Status", "Controls"];
       case "Doctors":
         return ["Ref ID", "Doctor Name & Title", "Degree / Qualification", "Specialty Department", "Email / Username", "Fee", "Status", "Controls"];
       case "Support":
@@ -327,9 +382,18 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Modal Label Configuration
+  // Modal Configuration
   const getModalConfig = () => {
     switch (activeModule) {
+      case "MASTER":
+        return {
+          title: isEditing ? "Edit Master Department Entry" : "Create Master Institutional Unit",
+          l1: "Department / Module Name", p1: "e.g. Neurology & Stroke Unit",
+          l2: "Clinical Head / In-Charge", p2: "e.g. Dr. Elena Rostova",
+          l3: "Campus Location / Building", p3: "e.g. Building B, Floor 4",
+          l4: "Capacity & Operational Details", p4: "e.g. 16 Beds, 2 Trauma Bays",
+          l5: "Base Tarif / Standard Spec", p5: "e.g. ₹600 Base OPD",
+        };
       case "Certificates":
         return {
           title: isEditing ? "Edit Certificate" : "Issue / Record Medical Certificate",
@@ -564,6 +628,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col font-sans text-slate-800">
+      {/* Header */}
       <DashboardHeader
         roleIcon="✓"
         loggedAsText="Admin (admin@gavanehospital.in)"
@@ -571,57 +636,142 @@ export default function AdminDashboardPage() {
         bannerText="Welcome to Gavane Hospital Management System"
       />
 
-      <div className="flex flex-1 overflow-hidden">
-        <DashboardSidebar
-          modules={ADMIN_MODULES}
-          activeModule={activeModule}
-          onSelectModule={(id) => {
-            setActiveModule(id);
-            setSearchTerm("");
-          }}
-          sectionTitle="Master Modules"
-        />
+      {/* Mobile Sidebar Trigger Bar */}
+      <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shadow-xs">
+        <div className="flex items-center space-x-2 text-xs font-bold text-white truncate">
+          <span className="text-teal-400">🏢 Module:</span>
+          <span className="uppercase text-teal-300 truncate">{activeModule} DESK</span>
+        </div>
+        <button
+          onClick={() => setMobileMenuOpen((prev) => !prev)}
+          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center space-x-1"
+        >
+          <span>{mobileMenuOpen ? "✕ Close" : "☰ Switch Module"}</span>
+        </button>
+      </div>
 
-        <main className="flex-1 p-5 overflow-y-auto space-y-5">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block">
+          <DashboardSidebar
+            modules={ADMIN_MODULES}
+            activeModule={activeModule}
+            onSelectModule={(id) => {
+              setActiveModule(id);
+              setSearchTerm("");
+            }}
+            sectionTitle="Master Modules"
+          />
+        </div>
+
+        {/* Mobile Collapsible Sidebar Drawer */}
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden flex flex-col bg-slate-950/80 backdrop-blur-sm">
+            <div className="w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-left duration-200">
+              <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                <span className="font-bold text-xs uppercase tracking-wider text-teal-400">Hospital Modules</span>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 font-bold hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                {ADMIN_MODULES.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      setActiveModule(m.id);
+                      setSearchTerm("");
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                      activeModule === m.id
+                        ? "bg-teal-600 text-white shadow-sm"
+                        : "text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2 truncate">
+                      <span>{m.icon}</span>
+                      <span className="truncate">{m.label}</span>
+                    </div>
+                    {m.adminBadge && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-extrabold">
+                        ADMIN
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1" onClick={() => setMobileMenuOpen(false)} />
+          </div>
+        )}
+
+        {/* Main Workspace Area */}
+        <main className="flex-1 p-3 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 min-w-0">
+          
           {/* Top Control Toolbar */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs">
-            <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 px-2 py-1">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-500"></span>
-              <span>Active Workspace: <strong className="text-teal-700 uppercase">{activeModule} Management Desk</strong></span>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-xs">
+            <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 px-1 py-0.5 min-w-0">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0"></span>
+              <span className="truncate">Active Workspace: <strong className="text-teal-700 uppercase">{activeModule} Management Desk</strong></span>
             </div>
 
-            <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
+            <div className="flex items-center space-x-2 w-full sm:w-auto justify-end shrink-0">
               <button
                 onClick={loadAllLedgers}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5"
+                className="flex-1 sm:flex-none px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold rounded-lg transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <span>🔄</span>
-                <span>Sync Live Data</span>
+                <span>Sync Live</span>
               </button>
 
               <button
                 onClick={handleOpenAddModal}
-                className="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center space-x-1.5"
+                className="flex-1 sm:flex-none px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <span>+</span>
-                <span>Add {activeModule === "Registration" ? "Patient" : activeModule === "Certificates" ? "Certificate" : `${activeModule} Record`}</span>
+                <span>Add {activeModule === "Registration" ? "Patient" : activeModule === "Certificates" ? "Certificate" : `${activeModule} Entry`}</span>
               </button>
             </div>
           </div>
 
           {/* Feedback Banner */}
           {feedback && (
-            <div className="p-3 rounded-xl border text-xs font-bold bg-emerald-50 border-emerald-300 text-emerald-900 flex justify-between">
+            <div className="p-3 rounded-xl border text-xs font-bold bg-emerald-50 border-emerald-300 text-emerald-900 flex justify-between items-center">
               <span>{feedback.text}</span>
-              <button onClick={() => setFeedback(null)} className="font-bold">✕</button>
+              <button onClick={() => setFeedback(null)} className="font-bold px-2 py-0.5">✕</button>
+            </div>
+          )}
+
+          {/* MASTER Overview Cards when activeModule === 'MASTER' */}
+          {activeModule === "MASTER" && (
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {[
+                { title: "Consultant Staff", count: `${dataStore.Doctors?.length || 3} Active`, desc: "3 Specialty Depts", icon: "🩺" },
+                { title: "IPD Capacity", count: "186 / 200", desc: "93% Hospital Occupancy", icon: "🛏️" },
+                { title: "Active Triage", count: `${sharedPatients.length} Registered`, desc: "Real-Time OPD Feed", icon: "🏥" },
+                { title: "OT Schedule", count: `${dataStore.OT?.length || 1} Booked`, desc: "General & Laparoscopy", icon: "✂️" },
+              ].map((card, i) => (
+                <div key={i} className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 shadow-xs">
+                  <div className="flex items-center justify-between text-slate-400 mb-1">
+                    <span className="text-[11px] font-bold uppercase">{card.title}</span>
+                    <span className="text-lg">{card.icon}</span>
+                  </div>
+                  <div className="text-lg sm:text-xl font-black text-slate-900">{card.count}</div>
+                  <div className="text-[10px] text-teal-600 font-semibold mt-0.5">{card.desc}</div>
+                </div>
+              ))}
             </div>
           )}
 
           {/* Dynamic Master Table Container */}
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
-                <h2 className="text-lg font-black text-slate-900 tracking-tight uppercase">
+                <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase">
                   {activeModule} Control Ledger
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5 font-medium">
@@ -636,7 +786,7 @@ export default function AdminDashboardPage() {
                   placeholder={`Search ${activeModule}...`}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                  className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                 />
               </div>
             </div>
@@ -650,9 +800,9 @@ export default function AdminDashboardPage() {
               pendingLabel="Pending Review"
             />
 
-            {/* Context-Aware Table */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-              <table className="w-full text-left text-xs text-slate-700">
+            {/* Horizontally Scrollable Table on Mobile */}
+            <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-xs">
+              <table className="w-full text-left text-xs text-slate-700 min-w-[750px]">
                 <thead className="bg-[#f8fafc] text-[10px] font-black uppercase text-slate-600 border-b border-slate-200 tracking-wider">
                   <tr>
                     {getTableHeaders().map((h, idx) => (
@@ -669,19 +819,19 @@ export default function AdminDashboardPage() {
                   {filteredRecords.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-5 py-10 text-center text-slate-400 font-medium">
-                        No {activeModule} records currently found. Click &quot;+ Add Record&quot; above to log an entry.
+                        No {activeModule} records currently found. Click &quot;+ Add Entry&quot; above to log an entry.
                       </td>
                     </tr>
                   ) : (
                     filteredRecords.map((item) => (
                       <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-4 py-3.5 font-bold text-teal-700">{item.reference_id}</td>
+                        <td className="px-4 py-3.5 font-bold text-teal-700 whitespace-nowrap">{item.reference_id}</td>
                         <td className="px-4 py-3.5 font-extrabold text-slate-900">{item.col1}</td>
                         <td className="px-4 py-3.5 font-medium text-slate-600">{item.col2}</td>
                         <td className="px-4 py-3.5 font-medium text-slate-700">{item.col3}</td>
                         <td className="px-4 py-3.5 font-medium text-slate-600">{item.col4}</td>
                         <td className="px-4 py-3.5 font-bold text-slate-800">{item.col5}</td>
-                        <td className="px-4 py-3.5">
+                        <td className="px-4 py-3.5 whitespace-nowrap">
                           <span
                             className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                               item.status === "Active" || item.status === "Completed"
@@ -697,14 +847,14 @@ export default function AdminDashboardPage() {
                         <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
                           <button
                             onClick={() => handleOpenEditModal(item as UnifiedRecord)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
                             title="Edit Record"
                           >
                             ✏️
                           </button>
                           <button
                             onClick={() => handleDeleteEntry(item.id, item.col1)}
-                            className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
+                            className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors cursor-pointer"
                             title="Delete Record"
                           >
                             🗑️
@@ -720,15 +870,16 @@ export default function AdminDashboardPage() {
         </main>
       </div>
 
-      <footer className="bg-[#0b1b2b] text-slate-400 px-4 py-2 text-[10px] flex items-center justify-between border-t border-slate-800">
+      {/* Sticky Bottom Status Footer */}
+      <footer className="bg-[#0b1b2b] text-slate-400 px-4 py-2 text-[10px] flex flex-col sm:flex-row items-center justify-between border-t border-slate-800 gap-1 text-center sm:text-left">
         <div>Current User :- <strong className="text-teal-400">Admin Console • Pune Central Node</strong></div>
         <div>Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span></div>
       </footer>
 
       {/* Dynamic Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 sm:p-6 space-y-4 my-auto max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
               <div>
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
@@ -738,7 +889,7 @@ export default function AdminDashboardPage() {
                   {modalConfig.title}
                 </h3>
               </div>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
             </div>
 
             <form onSubmit={handleSaveModalEntry} className="space-y-3.5">
@@ -754,7 +905,7 @@ export default function AdminDashboardPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">{modalConfig.l2} *</label>
                   <input
@@ -779,7 +930,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">{modalConfig.l4} *</label>
                   <input
@@ -819,12 +970,12 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="flex justify-end space-x-2 pt-3 border-t">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-slate-100 text-xs font-bold rounded-lg">
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-slate-100 text-xs font-bold rounded-lg cursor-pointer">
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm"
+                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
                 >
                   {isEditing ? "Save Changes" : `Commit Entry to ${activeModule}`}
                 </button>
