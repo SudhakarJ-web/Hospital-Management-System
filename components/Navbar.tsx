@@ -237,7 +237,7 @@ export default function Navbar() {
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-xs sm:text-base font-black tracking-tight text-slate-900 block leading-tight truncate">
-                  GAVANE<span className="text-teal-600">HOSPITAL</span>
+                  GAVANE <span className="text-teal-600">HOSPITAL</span>
                 </span>
                 <span className="text-[7.5px] sm:text-[9px] tracking-wider uppercase font-semibold text-slate-500 truncate">
                   Care & Clinical Excellence
@@ -250,7 +250,7 @@ export default function Navbar() {
               <Link href="/" className="hover:text-teal-600 transition-colors">Home</Link>
               <Link href="/about" className="hover:text-teal-600 transition-colors">About Us</Link>
               <Link href="/#facilities" className="hover:text-teal-600 transition-colors">Facilities</Link>
-              <Link href="/contact" className="hover:text-teal-600 transition-colors">Emergency & Contact</Link>
+              <Link href="/contact" className="hover:text-teal-600 transition-colors">Contact</Link>
             </div>
 
             {/* Right Action Portal Buttons & Mobile Hamburger */}
@@ -322,14 +322,14 @@ export default function Navbar() {
               onClick={() => setMobileNavOpen(false)}
               className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1"
             >
-              Facilities & Infrastructure
+              Facilities
             </Link>
             <Link
               href="/contact"
               onClick={() => setMobileNavOpen(false)}
               className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1"
             >
-              Emergency & Contact
+              Contact
             </Link>
           </div>
         )}

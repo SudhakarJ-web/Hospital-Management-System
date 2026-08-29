@@ -40,12 +40,7 @@ export default function HomePage() {
           >
             Book Appointment
           </Link>
-          <Link
-            href="/dashboard/doctor"
-            className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 font-bold rounded-xl transition-all active:scale-95 text-center text-sm"
-          >
-            Staff Portal Sign In
-          </Link>
+          
         </div>
       </section>
 
@@ -134,7 +129,7 @@ export default function HomePage() {
               name: "Dr. Sarah Jenkins",
               degree: "MD, Cardiology",
               spec: "Senior Cardiologist",
-              image: "https://images.unsplash.com/photo-1594824813629-9e8c45f448ea?auto=format&fit=crop&w=600&q=80",
+              image: "https://plus.unsplash.com/premium_photo-1661580574627-9211124e5c3f?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
             },
             {
               name: "Dr. Rajesh Kumar",
