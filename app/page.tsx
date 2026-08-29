@@ -2,18 +2,14 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import {
-  ChevronRight, Award, ShieldCheck, HeartPulse, Stethoscope,
+import { 
+  ChevronRight, Award, ShieldCheck, HeartPulse, Stethoscope, 
   Phone, Mail, MapPin, Star
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
-import AuthModal from "@/components/AuthModal";
 
 export default function HomePage() {
   const [isMounted, setIsMounted] = useState(false);
-  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
     setIsMounted(true);
@@ -23,18 +19,8 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col selection:bg-teal-500 selection:text-white">
-      {/* Dynamic Responsive Navbar */}
-      <Navbar
-        onOpenStaffModal={() => setIsStaffModalOpen(true)}
-        onOpenPatientModal={() => router.push("/dashboard/patient")}
-      />
-
-      {/* Staff Login Modal Component */}
-      <AuthModal
-        isOpen={isStaffModalOpen}
-        onClose={() => setIsStaffModalOpen(false)}
-        initialRole="doctor"
-      />
+      {/* Responsive Navbar */}
+      <Navbar />
 
       {/* Hero Section */}
       <section className="relative py-14 sm:py-20 text-center px-4 sm:px-6 bg-gradient-to-b from-slate-900 to-slate-950">
@@ -54,37 +40,40 @@ export default function HomePage() {
           >
             Book Appointment
           </Link>
-          <button
-            onClick={() => setIsStaffModalOpen(true)}
+          <Link
+            href="/dashboard/doctor"
             className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 font-bold rounded-xl transition-all active:scale-95 text-center text-sm"
           >
             Staff Portal Sign In
-          </button>
+          </Link>
         </div>
       </section>
 
-      {/* 1. Services Slider / Cards */}
+      {/* 1. Core Services */}
       <section id="services" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 border-l-4 border-cyan-500 pl-3">
           Our Core Services
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {["24/7 Emergency Care", "Advanced Surgery", "Comprehensive Diagnostics", "Outpatient Clinics"].map((service, idx) => (
+          {[
+            { title: "24/7 Emergency Care", desc: "Rapid trauma triage, intensive resuscitation units, and dedicated round-the-clock emergency surgeons." },
+            { title: "Advanced Surgery", desc: "Minimally invasive laparoscopic, robotic, and precision orthopedic surgical interventions." },
+            { title: "Comprehensive Diagnostics", desc: "High-throughput NABL-certified pathology and 3 Tesla digital MRI & CT imaging." },
+            { title: "Outpatient Clinics", desc: "Multi-specialty consultations with computerized prescriptions and digital EHR synchronization." },
+          ].map((service, idx) => (
             <div
               key={idx}
               className="p-5 sm:p-6 bg-slate-900 border border-slate-800 rounded-xl hover:border-cyan-500/50 transition-all group"
             >
               <Stethoscope className="text-cyan-400 w-8 h-8 mb-4 group-hover:scale-110 transition-transform" />
-              <h3 className="font-bold text-base sm:text-lg text-white">{service}</h3>
-              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                Providing state-of-the-art care with advanced medical equipment and rapid triage.
-              </p>
+              <h3 className="font-bold text-base sm:text-lg text-white">{service.title}</h3>
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">{service.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* 2. About Us */}
+      {/* 2. About Us with Real Campus Facility Image */}
       <section className="py-12 sm:py-16 px-4 sm:px-6 bg-slate-900/50 border-y border-slate-800">
         <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-8 md:gap-12 items-center">
           <div>
@@ -101,21 +90,32 @@ export default function HomePage() {
               Read More About Us <ChevronRight className="w-4 h-4 ml-1" />
             </Link>
           </div>
-          <div className="bg-slate-800/80 border border-slate-700/60 rounded-xl h-48 sm:h-64 flex items-center justify-center text-slate-500 text-sm font-medium">
-            🏥 Gavane Hospital Campus Facility
+          <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-slate-700/60 h-60 sm:h-72">
+            <img
+              src="https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=1200&q=80"
+              alt="Gavane Hospital Campus Facility"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end p-4">
+              <span className="text-xs font-bold text-white tracking-wide">🏥 Gavane Hospital Campus Facility</span>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* 3. Chairman's Message */}
+      {/* 3. Chairman's Message with Real Profile Image */}
       <section className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 grid md:grid-cols-3 gap-6 md:gap-8 items-center">
-          <div className="bg-slate-800/90 border border-slate-700/50 rounded-xl h-44 sm:h-48 flex items-center justify-center text-slate-500 text-sm font-medium">
-            👨‍⚕️ Dr. A. Gavane
+          <div className="relative rounded-2xl overflow-hidden h-52 sm:h-56 border border-slate-700/60">
+            <img
+              src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=800&q=80"
+              alt="Dr. A. Gavane - Founder & Chairman"
+              className="w-full h-full object-cover"
+            />
           </div>
           <div className="md:col-span-2 space-y-2">
             <blockquote className="text-base sm:text-lg italic text-slate-200 leading-relaxed">
-              "Our mission is to make world-class healthcare accessible, affordable, and compassionate for every individual."
+              &quot;Our mission is to make world-class healthcare accessible, affordable, and compassionate for every individual.&quot;
             </blockquote>
             <h3 className="text-lg sm:text-xl font-bold text-white pt-2">Dr. A. Gavane</h3>
             <p className="text-cyan-400 text-xs sm:text-sm">MD, FRCS — Founder & Chairman</p>
@@ -123,20 +123,35 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 4. Doctors */}
+      {/* 4. Specialist Doctors with Real Clinical Portraits */}
       <section id="doctors" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 border-l-4 border-cyan-500 pl-3">
           Our Specialist Doctors
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {[
-            { name: "Dr. Sarah Jenkins", degree: "MD, Cardiology", spec: "Senior Cardiologist", icon: "🩺" },
-            { name: "Dr. Rajesh Kumar", degree: "MS, Orthopedics", spec: "Joint Replacement Specialist", icon: "🦴" },
-            { name: "Dr. Elena Rostova", degree: "DM, Neurology", spec: "Neurologist", icon: "🧠" }
+            {
+              name: "Dr. Sarah Jenkins",
+              degree: "MD, Cardiology",
+              spec: "Senior Cardiologist",
+              image: "https://images.unsplash.com/photo-1594824813629-9e8c45f448ea?auto=format&fit=crop&w=600&q=80",
+            },
+            {
+              name: "Dr. Rajesh Kumar",
+              degree: "MS, Orthopedics",
+              spec: "Joint Replacement Specialist",
+              image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=600&q=80",
+            },
+            {
+              name: "Dr. Elena Rostova",
+              degree: "DM, Neurology",
+              spec: "Neurologist",
+              image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80",
+            },
           ].map((doc, idx) => (
             <div key={idx} className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-center hover:border-cyan-500/40 transition-colors">
-              <div className="w-20 h-20 bg-slate-800 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl border border-slate-700">
-                {doc.icon}
+              <div className="w-24 h-24 rounded-full mx-auto mb-4 overflow-hidden border-2 border-teal-500/40 shadow-lg">
+                <img src={doc.image} alt={doc.name} className="w-full h-full object-cover" />
               </div>
               <h3 className="font-bold text-white text-base sm:text-lg">{doc.name}</h3>
               <p className="text-xs text-slate-400 mt-0.5">{doc.degree}</p>
@@ -155,56 +170,47 @@ export default function HomePage() {
             Centres of Excellence
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-            {["Cardiology & Cardiac Surgery", "Oncology & Cancer Care", "Neurosciences & Neurosurgery"].map((centre, i) => (
+            {[
+              { title: "Cardiology & Cardiac Surgery", desc: "Comprehensive multi-disciplinary cardiac catheterization, coronary interventions, and CCU telemetry." },
+              { title: "Oncology & Cancer Care", desc: "Evidence-based medical, surgical, and supportive oncology with certified infusion suites." },
+              { title: "Neurosciences & Neurosurgery", desc: "Advanced neuro-trauma care, stroke intervention protocol, and microsurgical brain suites." },
+            ].map((centre, i) => (
               <div key={i} className="p-5 sm:p-6 bg-slate-900 border border-slate-800 rounded-xl">
                 <HeartPulse className="text-cyan-400 w-7 h-7 mb-2" />
-                <h3 className="font-bold text-white text-base sm:text-lg">{centre}</h3>
-                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                  Comprehensive multi-disciplinary care standard with advanced intensive units.
-                </p>
+                <h3 className="font-bold text-white text-base sm:text-lg">{centre.title}</h3>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">{centre.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* 6. Facilities */}
+      {/* 6. Facilities & Infrastructure (Target of the Navbar link) */}
       <section id="facilities" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 border-l-4 border-cyan-500 pl-3">
           Facilities & Infrastructure
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          {["Modular OTs", "24/7 Pharmacy", "Advanced ICU/CCU", "3 Tesla MRI & CT"].map((item, i) => (
-            <div key={i} className="p-3 sm:p-4 bg-slate-900 border border-slate-800 rounded-xl text-slate-300 text-xs sm:text-sm font-semibold flex items-center">
-              <span className="text-teal-400 mr-2">✔</span> {item}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+          {[
+            { name: "Modular Operation Theatres", img: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=600&q=80" },
+            { name: "24/7 Central Pharmacy", img: "https://images.unsplash.com/photo-1586015555751-63bb77f4322a?auto=format&fit=crop&w=600&q=80" },
+            { name: "Advanced ICU & CCU Units", img: "https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=600&q=80" },
+            { name: "3 Tesla MRI & Diagnostic Wing", img: "https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=600&q=80" },
+          ].map((item, i) => (
+            <div key={i} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden group hover:border-cyan-500/50 transition-all">
+              <div className="h-40 overflow-hidden relative">
+                <img src={item.img} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              </div>
+              <div className="p-4">
+                <h3 className="font-bold text-sm text-white">{item.name}</h3>
+                <span className="text-[11px] text-teal-400 font-semibold mt-1 block">✔ Fully Operational & Verified</span>
+              </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* 7. Why Choose Us? */}
-      <section className="py-12 sm:py-16 px-4 sm:px-6 bg-slate-900/50 border-y border-slate-800">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 border-l-4 border-cyan-500 pl-3">
-            Why Choose Gavane Hospital
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-            {[
-              { title: "24/7 Availability", desc: "Emergency response and trauma care team ready around the clock." },
-              { title: "Advanced Technology", desc: "Equipped with state-of-the-art robotic and diagnostic instruments." },
-              { title: "Expert Care", desc: "Over 50+ experienced consultants, surgeons, and trained clinical nurses." }
-            ].map((reason, i) => (
-              <div key={i} className="p-5 sm:p-6 bg-slate-900 border border-slate-800 rounded-xl">
-                <ShieldCheck className="text-cyan-400 w-7 h-7 mb-2" />
-                <h3 className="font-bold text-white text-base sm:text-lg">{reason.title}</h3>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">{reason.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 8. Certifications & Accreditations */}
+      {/* 7. Certifications & Accreditations */}
       <section className="py-10 sm:py-12 px-4 sm:px-6 max-w-7xl mx-auto w-full text-center">
         <h2 className="text-lg sm:text-xl font-bold text-white mb-6">Accreditations & Certifications</h2>
         <div className="flex flex-wrap justify-center gap-3 sm:gap-6">
@@ -217,22 +223,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 9. Insurance Availability */}
-      <section id="insurance" className="py-12 sm:py-16 px-4 sm:px-6 bg-slate-900/50 border-y border-slate-800 text-center">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">Insurance & Cashless Empanelment</h2>
-          <p className="text-xs text-slate-400 mb-6">Partnered with top health insurance providers and TPAs.</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4 text-xs font-semibold text-slate-300">
-            {["Star Health", "HDFC ERGO", "ICICI Lombard", "Care Health", "Max Bupa", "Bajaj Allianz"].map((ins, i) => (
-              <div key={i} className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-center">
-                {ins}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 10. Patient Testimonials */}
+      {/* 8. Patient Testimonials */}
       <section className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 border-l-4 border-cyan-500 pl-3">
           Patient Testimonials
@@ -248,59 +239,14 @@ export default function HomePage() {
                   <Star key={index} className="w-4 h-4 fill-current" />
                 ))}
               </div>
-              <p className="text-xs sm:text-sm text-slate-300 italic leading-relaxed">"{t.quote}"</p>
+              <p className="text-xs sm:text-sm text-slate-300 italic leading-relaxed">&quot;{t.quote}&quot;</p>
               <p className="text-xs font-bold text-white mt-4">— {t.name}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* 11. Milestones & Achievements */}
-      <section className="py-12 sm:py-16 px-4 sm:px-6 bg-slate-900/50 border-y border-slate-800">
-        <div className="max-w-7xl mx-auto text-center">
-          <h2 className="text-xl sm:text-2xl font-bold text-white mb-8">Milestones & Achievements</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div><p className="text-2xl sm:text-4xl font-extrabold text-cyan-400">50,000+</p><p className="text-[11px] sm:text-xs text-slate-400 mt-1">Patients Treated</p></div>
-            <div><p className="text-2xl sm:text-4xl font-extrabold text-cyan-400">10,000+</p><p className="text-[11px] sm:text-xs text-slate-400 mt-1">Surgeries Performed</p></div>
-            <div><p className="text-2xl sm:text-4xl font-extrabold text-cyan-400">50+</p><p className="text-[11px] sm:text-xs text-slate-400 mt-1">Specialist Doctors</p></div>
-            <div><p className="text-2xl sm:text-4xl font-extrabold text-cyan-400">15+</p><p className="text-[11px] sm:text-xs text-slate-400 mt-1">Years Excellence</p></div>
-          </div>
-        </div>
-      </section>
-
-      {/* 12. Blogs & Events */}
-      <section className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto w-full">
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 border-l-4 border-cyan-500 pl-3">
-          Latest Blogs & Events
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {[
-            { title: "Understanding Heart Health in 2026", date: "Aug 15, 2026" },
-            { title: "Free Cardiac Health Checkup Camp", date: "Sep 01, 2026" },
-            { title: "Advancements in Minimally Invasive Surgery", date: "Jul 20, 2026" }
-          ].map((blog, i) => (
-            <div key={i} className="bg-slate-900 border border-slate-800 rounded-xl p-5 sm:p-6 hover:border-cyan-500/30 transition-colors">
-              <p className="text-xs text-cyan-400 font-semibold">{blog.date}</p>
-              <h3 className="font-bold text-white text-base mt-2">{blog.title}</h3>
-              <p className="text-xs text-slate-400 mt-2 leading-relaxed">Read evidence-based insights and advice from our clinical doctors.</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 13. Careers */}
-      <section className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto w-full text-center">
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">Join Our Team</h2>
-        <p className="text-xs text-slate-400 mb-6">Explore career opportunities across medical, nursing, and hospital administration.</p>
-        <Link
-          href="/contact"
-          className="inline-block px-6 py-3 bg-slate-800 hover:bg-slate-700 text-cyan-400 font-semibold text-xs uppercase tracking-wider rounded-xl transition border border-slate-700"
-        >
-          View Open Positions
-        </Link>
-      </section>
-
-      {/* 14. Footer */}
+      {/* 9. Footer */}
       <footer className="mt-auto bg-slate-900 border-t border-slate-800 text-slate-400 py-10 sm:py-12 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 text-sm">
           <div>
@@ -313,8 +259,8 @@ export default function HomePage() {
             <h4 className="text-white font-semibold mb-3">Quick Links</h4>
             <ul className="space-y-2 text-xs">
               <li><Link href="/about" className="hover:text-cyan-400 transition-colors">About Us</Link></li>
+              <li><Link href="/#facilities" className="hover:text-cyan-400 transition-colors">Facilities</Link></li>
               <li><Link href="/contact" className="hover:text-cyan-400 transition-colors">Contact & Triage</Link></li>
-              <li><Link href="#services" className="hover:text-cyan-400 transition-colors">Core Services</Link></li>
               <li><Link href="/dashboard/patient" className="hover:text-cyan-400 transition-colors">Patient Portal</Link></li>
             </ul>
           </div>

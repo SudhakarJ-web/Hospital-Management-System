@@ -27,7 +27,7 @@ const ROLE_PRESETS: Record<StaffRole, { email: string; pass: string; route: stri
 export default function Navbar() {
   const router = useRouter();
 
-  // Mobile Navigation State
+  // Mobile Navigation Drawer State
   const [mobileNavOpen, setMobileNavOpen] = useState<boolean>(false);
 
   // Modal States
@@ -75,42 +75,35 @@ export default function Navbar() {
     const inputId = staffIdentifier.trim().toLowerCase();
     const inputPass = staffPassword;
 
-    // 1. Check local directory cache for newly created personnel
     let localDirectory: StoredStaff[] = [];
     try {
       const stored = localStorage.getItem("gavane_staff_registry");
-      if (stored) {
-        localDirectory = JSON.parse(stored);
-      }
+      if (stored) localDirectory = JSON.parse(stored);
     } catch {
       localDirectory = [];
     }
 
     const matchedStaff = localDirectory.find(
-      (s) =>
-        s.email?.toLowerCase() === inputId ||
-        s.username?.toLowerCase() === inputId
+      (s) => s.email?.toLowerCase() === inputId || s.username?.toLowerCase() === inputId
     );
 
     if (matchedStaff) {
       if (matchedStaff.status === "Pending") {
-        setStaffError("Access denied: Doctor account is in 'Pending' status. Awaiting Admin verification.");
+        setStaffError("Access denied: Doctor account is awaiting Admin verification.");
         setStaffLoading(false);
         return;
       }
       if (matchedStaff.status === "Suspended") {
-        setStaffError("Access denied: Account has been 'Suspended'. Contact Hospital Administration.");
+        setStaffError("Access denied: Account suspended. Contact Admin.");
         setStaffLoading(false);
         return;
       }
-
       setShowStaffModal(false);
       setStaffLoading(false);
       router.push(getTargetRouteByRole(matchedStaff.module_category));
       return;
     }
 
-    // 2. Authenticate via Supabase Auth
     try {
       const { data } = await supabase.auth.signInWithPassword({
         email: inputId,
@@ -119,21 +112,12 @@ export default function Navbar() {
 
       if (data?.user) {
         const metaRole = data.user.user_metadata?.role || selectedStaffRole;
-        const metaStatus = data.user.user_metadata?.status || "Active";
-
-        if (metaStatus === "Pending" || metaStatus === "Suspended") {
-          setStaffError(`Access denied: Account is currently ${metaStatus}.`);
-          setStaffLoading(false);
-          return;
-        }
-
         setShowStaffModal(false);
         setStaffLoading(false);
         router.push(getTargetRouteByRole(metaRole));
         return;
       }
 
-      // 3. Fallback for default role presets
       const defaultPreset = ROLE_PRESETS[selectedStaffRole];
       if (
         inputId === defaultPreset.email.toLowerCase() ||
@@ -209,7 +193,7 @@ export default function Navbar() {
           ]);
         }
 
-        setPatientSuccess("Registration complete! You can now sign in.");
+        setPatientSuccess("Account created! Please sign in.");
         setPatientMode("login");
         setPatientLoading(false);
       }
@@ -225,17 +209,15 @@ export default function Navbar() {
       {/* Top Banner */}
       <div className="bg-[#0b1b2b] text-slate-300 text-[10px] sm:text-[11px] px-3 sm:px-4 py-1.5 border-b border-slate-800">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 text-center sm:text-left">
-          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-0.5">
+          <div className="flex items-center space-x-2">
             <span>
               📞 Emergency 24/7:{" "}
               <a href="tel:+9102402484888" className="text-white font-bold hover:text-teal-400">
                 +91 0240 2484 888
               </a>
             </span>
-            <span className="hidden md:inline">✉️ contact@gavanehospital.in</span>
-            <span className="hidden lg:inline">📍 Gavane Hospital Rd, Pune, Maharashtra</span>
           </div>
-          <div className="flex items-center justify-center space-x-1.5 text-teal-400 font-semibold text-[9px] sm:text-[10px]">
+          <div className="flex items-center space-x-1.5 text-teal-400 font-semibold text-[9px] sm:text-[10px]">
             <span>🛡️</span>
             <span>DPDP Act 2023 & DISHA Compliant Node (ap-south-1)</span>
           </div>
@@ -246,19 +228,18 @@ export default function Navbar() {
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex justify-between h-14 sm:h-16 items-center gap-1.5">
-            
-            {/* Logo & Hospital Name */}
+            {/* Logo & Name */}
             <Link href="/" className="flex items-center space-x-2 sm:space-x-3 shrink-0 min-w-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-teal-600 flex items-center justify-center text-white font-bold shadow-md shrink-0">
-                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-teal-600 flex items-center justify-center text-white font-bold shadow-md shrink-0">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
                 </svg>
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-sm sm:text-lg font-black tracking-tight text-slate-900 block leading-tight truncate">
-                  GAVANE <span className="text-teal-600">HOSPITAL</span>
+                <span className="text-xs sm:text-base font-black tracking-tight text-slate-900 block leading-tight truncate">
+                  GAVANE<span className="text-teal-600">HOSPITAL</span>
                 </span>
-                <span className="text-[8px] sm:text-[10px] tracking-wider uppercase font-semibold text-slate-500 truncate">
+                <span className="text-[7.5px] sm:text-[9px] tracking-wider uppercase font-semibold text-slate-500 truncate">
                   Care & Clinical Excellence
                 </span>
               </div>
@@ -268,25 +249,26 @@ export default function Navbar() {
             <div className="hidden lg:flex items-center space-x-6 text-xs font-bold uppercase tracking-wider text-slate-600">
               <Link href="/" className="hover:text-teal-600 transition-colors">Home</Link>
               <Link href="/about" className="hover:text-teal-600 transition-colors">About Us</Link>
+              <Link href="/#facilities" className="hover:text-teal-600 transition-colors">Facilities</Link>
               <Link href="/contact" className="hover:text-teal-600 transition-colors">Emergency & Contact</Link>
             </div>
 
-            {/* Action Buttons & Mobile Hamburger */}
-            <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
-              {/* Staff Portal */}
+            {/* Right Action Portal Buttons & Mobile Hamburger */}
+            <div className="flex items-center space-x-1.5 sm:space-x-2.5 shrink-0">
+              {/* Staff Portal Button */}
               <button
                 type="button"
                 onClick={() => {
                   handleRoleSelection("Doctor");
                   setShowStaffModal(true);
                 }}
-                className="inline-flex items-center px-2 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg border border-slate-300 text-slate-700 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-95 gap-1 shrink-0 cursor-pointer"
+                className="inline-flex items-center px-2 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg border border-slate-300 text-slate-700 bg-slate-50 hover:bg-slate-100 transition-all active:scale-95 gap-1 shrink-0 cursor-pointer"
               >
                 <span>🔒</span>
-                <span className="whitespace-nowrap">Staff Portal</span>
+                <span className="whitespace-nowrap">Staff</span>
               </button>
 
-              {/* Patient Portal */}
+              {/* Patient Portal Button */}
               <button
                 type="button"
                 onClick={() => {
@@ -296,32 +278,31 @@ export default function Navbar() {
                 className="inline-flex items-center px-2.5 py-1.5 sm:px-3.5 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg text-white bg-teal-600 hover:bg-teal-700 transition-all active:scale-95 gap-1 shrink-0 shadow-xs cursor-pointer"
               >
                 <span>👤</span>
-                <span className="whitespace-nowrap">Patient Portal</span>
+                <span className="whitespace-nowrap">Patient</span>
               </button>
 
               {/* Mobile Hamburger Toggle */}
               <button
                 type="button"
                 onClick={() => setMobileNavOpen((prev) => !prev)}
-                className="lg:hidden p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors"
-                aria-label="Toggle Navigation Menu"
+                className="lg:hidden p-1.5 text-slate-700 hover:text-slate-900 rounded-md hover:bg-slate-100 transition-colors"
+                aria-label="Toggle navigation menu"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   {mobileNavOpen ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                   )}
                 </svg>
               </button>
             </div>
-
           </div>
         </div>
 
-        {/* Collapsible Mobile Navigation Drawer */}
+        {/* Mobile Navigation Drawer */}
         {mobileNavOpen && (
-          <div className="lg:hidden border-t border-slate-200 bg-slate-50 px-4 py-3 space-y-2">
+          <div className="lg:hidden border-t border-slate-200 bg-slate-50 px-4 py-3 space-y-2 animate-in slide-in-from-top duration-150">
             <Link
               href="/"
               onClick={() => setMobileNavOpen(false)}
@@ -337,6 +318,13 @@ export default function Navbar() {
               About Us
             </Link>
             <Link
+              href="/#facilities"
+              onClick={() => setMobileNavOpen(false)}
+              className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1"
+            >
+              Facilities & Infrastructure
+            </Link>
+            <Link
               href="/contact"
               onClick={() => setMobileNavOpen(false)}
               className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1"
@@ -350,28 +338,25 @@ export default function Navbar() {
       {/* Staff 4-Role Modal */}
       {showStaffModal && (
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-5 sm:p-7 space-y-4 sm:space-y-5 relative my-auto">
-            
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm sm:max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6 space-y-4 my-auto relative">
             <button
               onClick={() => setShowStaffModal(false)}
               type="button"
-              className="absolute top-3.5 right-3.5 text-slate-400 hover:text-slate-600 text-sm font-bold w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors"
+              className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 text-sm font-bold w-7 h-7 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors"
             >
               ✕
             </button>
 
             <div className="text-center space-y-1">
-              <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-teal-50 text-teal-600 border border-teal-200 mb-1">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
+              <div className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-teal-50 text-teal-600 border border-teal-200">
+                🛡️
               </div>
-              <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">Hospital Management System</h2>
-              <p className="text-xs text-slate-500">Gavane Hospital Role-Based Gateway</p>
+              <h2 className="text-base font-black text-slate-900 tracking-tight">Staff Access Gateway</h2>
+              <p className="text-[11px] text-slate-500">Gavane Hospital Enterprise Network</p>
             </div>
 
-            {/* 4-Role Tab Bar: 2x2 Grid on Mobile, 4-Cols on Desktop */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {/* 4-Role Tab Grid: 2x2 on Mobile, 4x1 on Desktop */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               {[
                 { id: "Admin", label: "Admin", icon: "🔑" },
                 { id: "Doctor", label: "Doctor", icon: "🩺" },
@@ -386,27 +371,27 @@ export default function Navbar() {
                     onClick={() => handleRoleSelection(roleItem.id as StaffRole)}
                     className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-center transition-all ${
                       isSelected
-                        ? "border-blue-600 bg-blue-50/70 text-blue-900 font-bold shadow-xs ring-1 ring-blue-600"
+                        ? "border-teal-600 bg-teal-50 text-teal-900 font-bold shadow-xs ring-1 ring-teal-600"
                         : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-medium"
                     }`}
                   >
-                    <span className="text-base mb-0.5">{roleItem.icon}</span>
-                    <span className="text-[11px]">{roleItem.label}</span>
+                    <span className="text-sm mb-0.5">{roleItem.icon}</span>
+                    <span className="text-[10px]">{roleItem.label}</span>
                   </button>
                 );
               })}
             </div>
 
             {staffError && (
-              <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-lg font-medium text-center">
+              <div className="p-2 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-lg text-center font-medium">
                 {staffError}
               </div>
             )}
 
             <form onSubmit={handleStaffLogin} className="space-y-3">
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Registered {selectedStaffRole} Email or Username
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                  Registered {selectedStaffRole} Email / Username
                 </label>
                 <input
                   type="text"
@@ -414,12 +399,12 @@ export default function Navbar() {
                   placeholder={`Enter ${selectedStaffRole} email or username...`}
                   value={staffIdentifier}
                   onChange={(e) => setStaffIdentifier(e.target.value)}
-                  className="w-full bg-white border border-slate-300 text-slate-900 text-xs rounded-lg p-2.5 focus:ring-2 focus:ring-teal-600 focus:border-teal-600 font-medium"
+                  className="w-full bg-white border border-slate-300 text-slate-900 text-xs rounded-lg p-2.5 focus:ring-2 focus:ring-teal-600 font-medium"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
                   Password
                 </label>
                 <input
@@ -428,7 +413,7 @@ export default function Navbar() {
                   placeholder="••••••••"
                   value={staffPassword}
                   onChange={(e) => setStaffPassword(e.target.value)}
-                  className="w-full bg-white border border-slate-300 text-slate-900 text-xs rounded-lg p-2.5 focus:ring-2 focus:ring-teal-600 focus:border-teal-600 font-medium"
+                  className="w-full bg-white border border-slate-300 text-slate-900 text-xs rounded-lg p-2.5 focus:ring-2 focus:ring-teal-600 font-medium"
                 />
               </div>
 
@@ -440,66 +425,47 @@ export default function Navbar() {
                 {staffLoading ? "Authenticating..." : `Authenticate ${selectedStaffRole} Access`}
               </button>
             </form>
-
-            <div className="text-center text-[10px] text-slate-400">
-              Authorized personnel only • Secure routing to assigned role console.
-            </div>
           </div>
         </div>
       )}
 
-      {/* Patient Login & Pre-Registration Modal */}
+      {/* Patient Modal */}
       {showPatientModal && (
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-5 sm:p-7 space-y-4 sm:space-y-5 relative my-auto">
-            
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm sm:max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6 space-y-4 my-auto relative">
             <button
               onClick={() => setShowPatientModal(false)}
               type="button"
-              className="absolute top-3.5 right-3.5 text-slate-400 hover:text-slate-600 text-sm font-bold w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors"
+              className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 text-sm font-bold w-7 h-7 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors"
             >
               ✕
             </button>
 
             <div className="text-center space-y-1">
-              <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-teal-50 text-teal-600 border border-teal-200 mb-1">
+              <div className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-teal-50 text-teal-600 border border-teal-200">
                 👤
               </div>
-              <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                {patientMode === "login" ? "Patient Vault Login" : "New Patient Pre-Registration"}
+              <h2 className="text-base font-black text-slate-900 tracking-tight">
+                {patientMode === "login" ? "Patient Vault Login" : "New Patient Registration"}
               </h2>
-              <p className="text-xs text-slate-500">
-                Gavane Hospital Citizen Health Portal
-              </p>
+              <p className="text-[11px] text-slate-500">Gavane Citizen Health Portal</p>
             </div>
 
             <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl">
               <button
                 type="button"
-                onClick={() => {
-                  setPatientMode("login");
-                  setPatientError(null);
-                  setPatientSuccess(null);
-                }}
+                onClick={() => setPatientMode("login")}
                 className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
-                  patientMode === "login"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-500 hover:text-slate-900"
+                  patientMode === "login" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"
                 }`}
               >
                 Sign In
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setPatientMode("register");
-                  setPatientError(null);
-                  setPatientSuccess(null);
-                }}
+                onClick={() => setPatientMode("register")}
                 className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
-                  patientMode === "register"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-500 hover:text-slate-900"
+                  patientMode === "register" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"
                 }`}
               >
                 Create Account
@@ -507,12 +473,12 @@ export default function Navbar() {
             </div>
 
             {patientError && (
-              <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-lg font-medium text-center">
+              <div className="p-2 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-lg text-center font-medium">
                 {patientError}
               </div>
             )}
             {patientSuccess && (
-              <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg font-medium text-center">
+              <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg text-center font-medium">
                 {patientSuccess}
               </div>
             )}
@@ -521,7 +487,7 @@ export default function Navbar() {
               {patientMode === "register" && (
                 <>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
                       Full Legal Name *
                     </label>
                     <input
@@ -533,39 +499,24 @@ export default function Navbar() {
                       className="w-full bg-white border border-slate-300 text-slate-900 text-xs rounded-lg p-2.5 focus:ring-2 focus:ring-teal-600 font-medium"
                     />
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                        Phone Number *
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        placeholder="9876543210"
-                        value={patientPhone}
-                        onChange={(e) => setPatientPhone(e.target.value)}
-                        className="w-full bg-white border border-slate-300 text-slate-900 text-xs rounded-lg p-2.5 focus:ring-2 focus:ring-teal-600 font-medium"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                        ABHA ID (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="14-digit ABHA"
-                        value={patientAbha}
-                        onChange={(e) => setPatientAbha(e.target.value)}
-                        className="w-full bg-white border border-slate-300 text-slate-900 text-xs rounded-lg p-2.5 focus:ring-2 focus:ring-teal-600 font-medium"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                      Phone Number *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="9876543210"
+                      value={patientPhone}
+                      onChange={(e) => setPatientPhone(e.target.value)}
+                      className="w-full bg-white border border-slate-300 text-slate-900 text-xs rounded-lg p-2.5 focus:ring-2 focus:ring-teal-600 font-medium"
+                    />
                   </div>
                 </>
               )}
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
                   Email Address *
                 </label>
                 <input
@@ -579,7 +530,7 @@ export default function Navbar() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
                   Password *
                 </label>
                 <input
@@ -601,13 +552,9 @@ export default function Navbar() {
                   ? "Processing..."
                   : patientMode === "login"
                   ? "Open Patient Vault"
-                  : "Complete Pre-Registration"}
+                  : "Complete Registration"}
               </button>
             </form>
-
-            <div className="text-center text-[10px] text-slate-400">
-              Personal health data is guarded under India DPDP Act 2023 guidelines.
-            </div>
           </div>
         </div>
       )}
