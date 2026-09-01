@@ -2,30 +2,29 @@
 
 import React from "react";
 import MetricsStrip from "@/components/dashboard/MetricsStrip";
-import { UnifiedRecord } from "@/app/dashboard/admin/page";
+import { UnifiedRecord } from "@/lib/sync/hospitalMasterSync";
 
-interface MasterOverviewTabProps {
+interface MasterOverviewProps {
   records: UnifiedRecord[];
   searchTerm: string;
-  onSearchChange: (term: string) => void;
-  onOpenAddModal: () => void;
-  onOpenEditModal: (record: UnifiedRecord) => void;
-  onDeleteRecord: (id: string, name: string) => void;
+  onSearchChange: (val: string) => void;
+  onOpenEdit: (item: UnifiedRecord) => void;
+  onDelete: (id: string, name: string) => void;
   activeDoctorsCount: number;
   totalRegisteredPatients: number;
   activeOtCount: number;
 }
 
-export default function MasterOverviewTab({
+export default function MasterOverview({
   records,
   searchTerm,
   onSearchChange,
-  onOpenEditModal,
-  onDeleteRecord,
+  onOpenEdit,
+  onDelete,
   activeDoctorsCount,
   totalRegisteredPatients,
   activeOtCount,
-}: MasterOverviewTabProps) {
+}: MasterOverviewProps) {
   const filtered = records.filter(
     (r) =>
       r.col1.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -40,13 +39,12 @@ export default function MasterOverviewTab({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* KPI Overview Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {[
           { title: "Consultant Staff", count: `${activeDoctorsCount} Active`, desc: "Specialty Depts", icon: "🩺" },
           { title: "IPD Capacity", count: "186 / 200", desc: "93% Hospital Occupancy", icon: "🛏️" },
           { title: "Active Triage", count: `${totalRegisteredPatients} Registered`, desc: "Live OPD Feed", icon: "🏥" },
-          { title: "OT Schedule", count: `${activeOtCount} Booked`, desc: "General & Laparoscopy", icon: "✂️" },
+          { title: "OT Schedule", count: `${activeOtCount} Booked`, desc: "Surgical Complex", icon: "✂️" },
         ].map((card, i) => (
           <div key={i} className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 shadow-xs">
             <div className="flex items-center justify-between text-slate-400 mb-1">
@@ -59,7 +57,6 @@ export default function MasterOverviewTab({
         ))}
       </div>
 
-      {/* Master Control Ledger Table */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-100 pb-4">
           <div>
@@ -87,7 +84,7 @@ export default function MasterOverviewTab({
           totalCount={totalCount}
           activeCount={activeCount}
           pendingCount={pendingCount}
-          totalLabel="Total Master Entries"
+          totalLabel="Total Master Units"
           activeLabel="Operational / Active"
           pendingLabel="Pending Review"
         />
@@ -99,7 +96,7 @@ export default function MasterOverviewTab({
                 <th className="px-4 py-3.5">Ref ID</th>
                 <th className="px-4 py-3.5">Department / Module</th>
                 <th className="px-4 py-3.5">Clinical Head</th>
-                <th className="px-4 py-3.5">Campus Unit / Location</th>
+                <th className="px-4 py-3.5">Location</th>
                 <th className="px-4 py-3.5">Capacity & Scope</th>
                 <th className="px-4 py-3.5">Base Tarif / Spec</th>
                 <th className="px-4 py-3.5">Status</th>
@@ -107,51 +104,29 @@ export default function MasterOverviewTab({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-slate-400 font-medium">
-                    No master entries found.
+              {filtered.map((item) => (
+                <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="px-4 py-3.5 font-bold text-teal-700 whitespace-nowrap">{item.reference_id}</td>
+                  <td className="px-4 py-3.5 font-extrabold text-slate-900">{item.col1}</td>
+                  <td className="px-4 py-3.5 font-medium text-slate-600">{item.col2}</td>
+                  <td className="px-4 py-3.5 font-medium text-slate-700">{item.col3}</td>
+                  <td className="px-4 py-3.5 font-medium text-slate-600">{item.col4}</td>
+                  <td className="px-4 py-3.5 font-bold text-slate-800">{item.col5}</td>
+                  <td className="px-4 py-3.5 whitespace-nowrap">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      {item.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
+                    <button onClick={() => onOpenEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded cursor-pointer" title="Edit">
+                      ✏️
+                    </button>
+                    <button onClick={() => onDelete(item.id, item.col1)} className="p-1.5 text-red-500 hover:bg-red-50 rounded cursor-pointer" title="Delete">
+                      🗑️
+                    </button>
                   </td>
                 </tr>
-              ) : (
-                filtered.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-4 py-3.5 font-bold text-teal-700 whitespace-nowrap">{item.reference_id}</td>
-                    <td className="px-4 py-3.5 font-extrabold text-slate-900">{item.col1}</td>
-                    <td className="px-4 py-3.5 font-medium text-slate-600">{item.col2}</td>
-                    <td className="px-4 py-3.5 font-medium text-slate-700">{item.col3}</td>
-                    <td className="px-4 py-3.5 font-medium text-slate-600">{item.col4}</td>
-                    <td className="px-4 py-3.5 font-bold text-slate-800">{item.col5}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                          item.status === "Active" || item.status === "Completed"
-                            ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                            : "bg-amber-100 text-amber-800 border border-amber-200"
-                        }`}
-                      >
-                        {item.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
-                      <button
-                        onClick={() => onOpenEditModal(item)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
-                        title="Edit Record"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => onDeleteRecord(item.id, item.col1)}
-                        className="p-1.5 text-red-500 hover:bg-red-50 rounded cursor-pointer"
-                        title="Delete Record"
-                      >
-                        🗑️
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
         </div>

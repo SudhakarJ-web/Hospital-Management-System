@@ -1,29 +1,27 @@
 "use client";
 
 import React from "react";
-import MetricsStrip from "@/components/dashboard/MetricsStrip";
-import { UnifiedRecord } from "@/app/dashboard/admin/page";
+import { UnifiedRecord } from "@/lib/sync/hospitalMasterSync";
 
-interface UtilityTabProps {
+interface BiomedicalUtilityProps {
   records: UnifiedRecord[];
   searchTerm: string;
-  onSearchChange: (term: string) => void;
-  onOpenEditModal: (record: UnifiedRecord) => void;
-  onDeleteRecord: (id: string, name: string) => void;
+  onSearchChange: (val: string) => void;
+  onOpenEdit: (item: UnifiedRecord) => void;
+  onDelete: (id: string, name: string) => void;
 }
 
-export default function UtilityTab({
+export default function BiomedicalUtility({
   records,
   searchTerm,
   onSearchChange,
-  onOpenEditModal,
-  onDeleteRecord,
-}: UtilityTabProps) {
+  onOpenEdit,
+  onDelete,
+}: BiomedicalUtilityProps) {
   const filtered = records.filter(
     (r) =>
       r.col1.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.col2.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.col3.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.reference_id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -35,10 +33,9 @@ export default function UtilityTab({
             Biomedical Engineering & Utilities
           </h2>
           <p className="text-xs text-slate-500 mt-0.5 font-medium">
-            Medical Gases, Power Backups & Sensor Calibration • Showing {filtered.length} Monitored System(s)
+            Medical Gases, Power Infrastructure & Calibration Logs • Showing {filtered.length} System(s)
           </p>
         </div>
-
         <div className="relative w-full md:w-72">
           <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-xs">🔍</span>
           <input
@@ -56,10 +53,10 @@ export default function UtilityTab({
           <thead className="bg-[#f8fafc] text-[10px] font-black uppercase text-slate-600 border-b border-slate-200 tracking-wider">
             <tr>
               <th className="px-4 py-3.5">Unit ID</th>
-              <th className="px-4 py-3.5">Equipment / Infrastructure</th>
-              <th className="px-4 py-3.5">Operational Parameter</th>
-              <th className="px-4 py-3.5">Installation Location</th>
-              <th className="px-4 py-3.5">Next Maintenance / Audit</th>
+              <th className="px-4 py-3.5">Equipment / Plant</th>
+              <th className="px-4 py-3.5">Parameter</th>
+              <th className="px-4 py-3.5">Location</th>
+              <th className="px-4 py-3.5">Next Maintenance</th>
               <th className="px-4 py-3.5">Engineering In-Charge</th>
               <th className="px-4 py-3.5">Status</th>
               <th className="px-4 py-3.5 text-right">Controls</th>
@@ -75,25 +72,13 @@ export default function UtilityTab({
                 <td className="px-4 py-3.5 font-medium text-slate-600">{item.col4}</td>
                 <td className="px-4 py-3.5 font-bold text-slate-800">{item.col5}</td>
                 <td className="px-4 py-3.5 whitespace-nowrap">
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
                     {item.status}
                   </span>
                 </td>
                 <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
-                  <button
-                    onClick={() => onOpenEditModal(item)}
-                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
-                    title="Edit Utility"
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    onClick={() => onDeleteRecord(item.id, item.col1)}
-                    className="p-1.5 text-red-500 hover:bg-red-50 rounded cursor-pointer"
-                    title="Delete Utility"
-                  >
-                    🗑️
-                  </button>
+                  <button onClick={() => onOpenEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded cursor-pointer">✏️</button>
+                  <button onClick={() => onDelete(item.id, item.col1)} className="p-1.5 text-red-500 hover:bg-red-50 rounded cursor-pointer">🗑️</button>
                 </td>
               </tr>
             ))}

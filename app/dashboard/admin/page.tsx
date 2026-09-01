@@ -4,21 +4,31 @@ import React, { useState, useEffect, useCallback } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar, { SidebarModule } from "@/components/dashboard/DashboardSidebar";
 
-// Import modular tab views
-import MasterOverviewTab from "@/components/dashboard/admin/MasterOverviewTab";
-import DoctorsTab from "@/components/dashboard/admin/DoctorsTab";
-import SupportTab from "@/components/dashboard/admin/SupportTab";
-import MedicalTab from "@/components/dashboard/admin/MedicalTab";
-import RegistrationTab from "@/components/dashboard/admin/RegistrationTab";
-import GenericModuleTab from "@/components/dashboard/admin/GenericModuleTab";
-import StockTab from "@/components/dashboard/admin/StockTab";
-import BillingTab from "@/components/dashboard/admin/BillingTab";
-import AnalysisTab from "@/components/dashboard/admin/AnalysisTab";
-import UtilityTab from "@/components/dashboard/admin/UtilityTab";
-import BackupTab from "@/components/dashboard/admin/BackupTab";
-import CertificatesTab from "@/components/dashboard/admin/CertificatesTab";
+// Admin-Exclusive Modules
+import MasterOverview from "@/components/dashboard/admin/MasterOverview";
+import DoctorsManagement from "@/components/dashboard/admin/DoctorsManagement";
+import SupportStaffManagement from "@/components/dashboard/admin/SupportStaffManagement";
+import MedicalOfficersManagement from "@/components/dashboard/admin/MedicalOfficersManagement";
+import AnalyticsConsole from "@/components/dashboard/admin/AnalyticsConsole";
+import BiomedicalUtility from "@/components/dashboard/admin/BiomedicalUtility";
+import ComplianceBackup from "@/components/dashboard/admin/ComplianceBackup";
 
-import { getSharedPatients, saveSharedPatient, SharedPatient } from "@/lib/sync/patientsSync";
+// Shared Universal Modules
+import RegistrationView from "@/components/dashboard/shared/RegistrationView";
+import CertificatesView from "@/components/dashboard/shared/CertificatesView";
+import ClinicalQueueView from "@/components/dashboard/shared/ClinicalQueueView";
+import InventoryView from "@/components/dashboard/shared/InventoryView";
+import BillingView from "@/components/dashboard/shared/BillingView";
+import DiagnosticsView from "@/components/dashboard/shared/DiagnosticsView";
+import SurgeryOtView from "@/components/dashboard/shared/SurgeryOtView";
+
+import {
+  getUniversalStore,
+  saveUniversalRecord,
+  deleteUniversalRecord,
+  UnifiedRecord,
+} from "@/lib/sync/hospitalMasterSync";
+import { getSharedPatients, saveSharedPatient, deleteSharedPatient, SharedPatient } from "@/lib/sync/patientsSync";
 import {
   getSharedCertificates,
   saveSharedCertificate,
@@ -45,276 +55,16 @@ const ADMIN_MODULES: SidebarModule[] = [
   { id: "Backup", label: "BACKUP", icon: "💾", adminBadge: false },
 ];
 
-export interface UnifiedRecord {
-  id: string;
-  reference_id: string;
-  category: string;
-  col1: string;
-  col2: string;
-  col3: string;
-  col4: string;
-  col5: string;
-  status: "Active" | "Pending" | "Completed" | "Suspended";
-  created_at: string;
-}
-
-const INITIAL_DOMAIN_DATA: Record<string, UnifiedRecord[]> = {
-  MASTER: [
-    {
-      id: "mst-1",
-      reference_id: "GH-MST-001",
-      category: "MASTER",
-      col1: "Cardiology & Cardiac Sciences",
-      col2: "Head: Dr. Ananya Rao",
-      col3: "Building A • Floor 3",
-      col4: "24 Beds Active • 4 CCU",
-      col5: "₹500 Base OPD",
-      status: "Active",
-      created_at: "27/08/2026",
-    },
-    {
-      id: "mst-2",
-      reference_id: "GH-MST-002",
-      category: "MASTER",
-      col1: "Trauma & Emergency Care Unit",
-      col2: "Head: Dr. Sudhir Gavane",
-      col3: "Ground Floor Triage",
-      col4: "12 Acute Bays • 2 Resus",
-      col5: "24/7 Dedicated Team",
-      status: "Active",
-      created_at: "27/08/2026",
-    },
-    {
-      id: "mst-3",
-      reference_id: "GH-MST-003",
-      category: "MASTER",
-      col1: "Pediatrics & Neonatal Care",
-      col2: "Head: Dr. Priya",
-      col3: "Building B • Floor 2",
-      col4: "18 Beds • 6 NICU Bays",
-      col5: "₹500 Base OPD",
-      status: "Active",
-      created_at: "27/08/2026",
-    },
-    {
-      id: "mst-4",
-      reference_id: "GH-MST-004",
-      category: "MASTER",
-      col1: "Central Diagnostic Pathology Lab",
-      col2: "In-Charge: Kiran Deshmukh",
-      col3: "Building A • Basement 1",
-      col4: "NABL Certified Node",
-      col5: "High-Throughput CBC/Bio",
-      status: "Active",
-      created_at: "27/08/2026",
-    },
-  ],
-  Doctors: [
-    {
-      id: "doc-1",
-      reference_id: "GH-2026-001",
-      category: "Doctors",
-      col1: "Dr. Ananya Rao",
-      col2: "MBBS, MD (Cardiology)",
-      col3: "Cardiology Dept",
-      col4: "ananya@gavanehospital.in (ananya.rao)",
-      col5: "₹500",
-      status: "Active",
-      created_at: "27/08/2026",
-    },
-    {
-      id: "doc-2",
-      reference_id: "GH-2026-002",
-      category: "Doctors",
-      col1: "Dr. Sudhir Gavane",
-      col2: "MS (General Surgery)",
-      col3: "General Surgery",
-      col4: "sudhir@gavanehospital.in (sudhir.gavane)",
-      col5: "₹600",
-      status: "Active",
-      created_at: "27/08/2026",
-    },
-  ],
-  Support: [
-    {
-      id: "sup-1",
-      reference_id: "GH-2026-SUP01",
-      category: "Support",
-      col1: "Rajesh Patil",
-      col2: "Senior Front Desk Executive",
-      col3: "Main Reception & Triage",
-      col4: "+91 91567 44415",
-      col5: "Morning Shift (08:00 - 16:00)",
-      status: "Active",
-      created_at: "27/08/2026",
-    },
-  ],
-  Medical: [
-    {
-      id: "med-1",
-      reference_id: "GH-2026-MED01",
-      category: "Medical",
-      col1: "Priya Nair",
-      col2: "Chief Pharmacist (B.Pharm)",
-      col3: "Central Pharmacy Depot",
-      col4: "Lic: MH-PH-88912",
-      col5: "priya.nair@gavanehospital.in",
-      status: "Active",
-      created_at: "27/08/2026",
-    },
-  ],
-  OPD: [
-    {
-      id: "opd-1",
-      reference_id: "GH-OPD-101",
-      category: "OPD",
-      col1: "Ramesh Kulkarni",
-      col2: "Token #01",
-      col3: "General Medicine",
-      col4: "BP: 120/80 • Pulse: 72",
-      col5: "Dr. Ananya Rao",
-      status: "Active",
-      created_at: "Today 10:15 AM",
-    },
-  ],
-  IPD: [
-    {
-      id: "ipd-1",
-      reference_id: "GH-IPD-301",
-      category: "IPD",
-      col1: "Amit Patil",
-      col2: "Bed 204 (Semi-Private)",
-      col3: "Orthopedics Ward",
-      col4: "Admitted: 26/08/2026",
-      col5: "Dr. Sudhir Gavane",
-      status: "Active",
-      created_at: "26/08/2026",
-    },
-  ],
-  OT: [
-    {
-      id: "ot-1",
-      reference_id: "GH-OT-881",
-      category: "OT",
-      col1: "Laparoscopic Appendectomy",
-      col2: "Patient: Ramesh Jadhav",
-      col3: "OT Complex - Theater 2",
-      col4: "Slot: 02:30 PM - 04:00 PM",
-      col5: "Chief Surgeon: Dr. Sudhir Gavane",
-      status: "Pending",
-      created_at: "28/08/2026",
-    },
-  ],
-  Radiology: [
-    {
-      id: "rad-1",
-      reference_id: "GH-RAD-401",
-      category: "Radiology",
-      col1: "Digital Chest X-Ray (PA View)",
-      col2: "Patient: Sunita Deshmukh",
-      col3: "X-Ray Room 1",
-      col4: "Ref Doctor: Dr. Ananya Rao",
-      col5: "Tech: Vishal More",
-      status: "Completed",
-      created_at: "Today 09:45 AM",
-    },
-  ],
-  Pathology: [
-    {
-      id: "path-1",
-      reference_id: "GH-LAB-901",
-      category: "Pathology",
-      col1: "Complete Blood Count (CBC) + ESR",
-      col2: "Sample ID: SMP-88219",
-      col3: "Hematology Section",
-      col4: "Patient: Sagar Jadhav",
-      col5: "Tech: Kiran Deshmukh",
-      status: "Active",
-      created_at: "Today 10:00 AM",
-    },
-  ],
-  Stock: [
-    {
-      id: "stk-1",
-      reference_id: "MED-2026-881",
-      category: "Stock",
-      col1: "Tab. Paracetamol 650mg (Dolo)",
-      col2: "SKU: TAB-DOLO-650",
-      col3: "Batch: BAT-2026-X01",
-      col4: "Stock: 4,500 Units • ₹2.50/unit",
-      col5: "Exp: 12/2027",
-      status: "Active",
-      created_at: "20/08/2026",
-    },
-  ],
-  Billing: [
-    {
-      id: "bil-1",
-      reference_id: "INV-2026-001",
-      category: "Billing",
-      col1: "Ramesh Kulkarni",
-      col2: "General OPD Consultation Fee",
-      col3: "₹500.00 (Cash / UPI)",
-      col4: "Desk: Front Counter 1",
-      col5: "Cleared & Paid",
-      status: "Completed",
-      created_at: "Today 10:35 AM",
-    },
-  ],
-  Analysis: [
-    {
-      id: "ana-1",
-      reference_id: "KPI-2026-AUG",
-      category: "Analysis",
-      col1: "Daily Patient Outpatient Flow",
-      col2: "Total Footfall: 142 Citizens",
-      col3: "OPD: 110 | IPD: 18 | Emergency: 14",
-      col4: "Peak Hours: 10:00 AM - 01:00 PM",
-      col5: "98.4% On-Time Consultations",
-      status: "Active",
-      created_at: "Live Feed",
-    },
-  ],
-  Utility: [
-    {
-      id: "ut-1",
-      reference_id: "UTIL-01",
-      category: "Utility",
-      col1: "Main Liquid Oxygen Plant (10 KL)",
-      col2: "Pressure: 4.8 Bar (Optimal)",
-      col3: "Central Supply Manifold",
-      col4: "Next Audit: 05/09/2026",
-      col5: "Operator: Engineering Desk",
-      status: "Active",
-      created_at: "28/08/2026",
-    },
-  ],
-  Backup: [
-    {
-      id: "bk-1",
-      reference_id: "BAK-2026-0828",
-      category: "Backup",
-      col1: "DPDP Encrypted Snapshot",
-      col2: "Size: 428 MB (PostgreSQL + Assets)",
-      col3: "AP-South-1 (Mumbai Node)",
-      col4: "Timestamp: 28/08/2026 09:00 AM",
-      col5: "Integrity: SHA-256 Verified",
-      status: "Completed",
-      created_at: "Today 09:00 AM",
-    },
-  ],
-};
-
 export default function AdminDashboardPage() {
   const [activeModule, setActiveModule] = useState<string>("MASTER");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
-  const [dataStore, setDataStore] = useState<Record<string, UnifiedRecord[]>>(INITIAL_DOMAIN_DATA);
-  const [sharedPatients, setSharedPatients] = useState<SharedPatient[]>([]);
-  const [sharedCertificates, setSharedCertificates] = useState<SharedCertificate[]>([]);
+
+  const [dataStore, setDataStore] = useState<Record<string, UnifiedRecord[]>>({});
+  const [patients, setPatients] = useState<SharedPatient[]>([]);
+  const [certificates, setCertificates] = useState<SharedCertificate[]>([]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Modal State
   const [showModal, setShowModal] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editTargetId, setEditTargetId] = useState<string | null>(null);
@@ -325,48 +75,17 @@ export default function AdminDashboardPage() {
   const [formCol5, setFormCol5] = useState("");
   const [formStatus, setFormStatus] = useState<"Active" | "Pending" | "Completed" | "Suspended">("Active");
 
-  const loadAllLedgers = useCallback(async () => {
-    const pts = await getSharedPatients();
-    setSharedPatients(pts);
-
-    const certs = await getSharedCertificates();
-    setSharedCertificates(certs);
-
-    try {
-      const cached = localStorage.getItem("gavane_admin_master_store");
-      if (cached) setDataStore(JSON.parse(cached));
-    } catch {}
+  const loadData = useCallback(async () => {
+    setDataStore(getUniversalStore());
+    setPatients(await getSharedPatients());
+    setCertificates(await getSharedCertificates());
   }, []);
 
   useEffect(() => {
-    loadAllLedgers();
-  }, [loadAllLedgers]);
+    loadData();
+  }, [loadData]);
 
-  const persistData = (updatedStore: Record<string, UnifiedRecord[]>) => {
-    setDataStore(updatedStore);
-    try {
-      localStorage.setItem("gavane_admin_master_store", JSON.stringify(updatedStore));
-    } catch {}
-  };
-
-  const getGenericHeaders = (mod: string) => {
-    switch (mod) {
-      case "OPD":
-        return ["Token / ID", "Patient Legal Name", "Token Number", "Consultation Specialty", "Observed Vitals", "Assigned Doctor", "Status", "Controls"];
-      case "IPD":
-        return ["Admission ID", "Patient Legal Name", "Bed & Ward Assignment", "Department Ward", "Admission Date", "Attending Consultant", "Status", "Controls"];
-      case "OT":
-        return ["Surgery ID", "Surgical Procedure", "Patient Name", "OT Theater Complex", "Scheduled Slot", "Chief Surgeon", "Status", "Controls"];
-      case "Radiology":
-        return ["Scan ID", "Imaging Investigation", "Patient Name", "Radiology Suite", "Request Timestamp", "Technician / Radiologist", "Status", "Controls"];
-      case "Pathology":
-        return ["Sample ID", "Diagnostic Panel", "Sample Identifier", "Lab Section", "Patient Name", "Technician / Notes", "Status", "Controls"];
-      default:
-        return ["Ref ID", "Primary Subject", "Detail", "Department", "Metadata", "Owner / Notes", "Status", "Controls"];
-    }
-  };
-
-  const handleOpenAddModal = () => {
+  const handleOpenAdd = () => {
     setIsEditing(false);
     setEditTargetId(null);
     setFormCol1("");
@@ -378,7 +97,7 @@ export default function AdminDashboardPage() {
     setShowModal(true);
   };
 
-  const handleOpenEditModal = (item: UnifiedRecord) => {
+  const handleOpenEdit = (item: UnifiedRecord) => {
     setIsEditing(true);
     setEditTargetId(item.id);
     setFormCol1(item.col1);
@@ -390,7 +109,7 @@ export default function AdminDashboardPage() {
     setShowModal(true);
   };
 
-  const handleSaveModalEntry = async (e: React.FormEvent) => {
+  const handleSaveModal = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (activeModule === "Registration") {
@@ -407,8 +126,8 @@ export default function AdminDashboardPage() {
         created_at: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
       };
       const updated = await saveSharedPatient(newPt);
-      setSharedPatients(updated);
-      setFeedback({ type: "success", text: `Patient ${formCol1} registered.` });
+      setPatients(updated);
+      setFeedback({ type: "success", text: `Patient ${formCol1} saved.` });
       setShowModal(false);
       return;
     }
@@ -427,68 +146,37 @@ export default function AdminDashboardPage() {
         created_at: new Date().toLocaleDateString("en-IN"),
       };
       const updatedCerts = await saveSharedCertificate(certObj);
-      setSharedCertificates(updatedCerts);
+      setCertificates(updatedCerts);
       setFeedback({ type: "success", text: `Certificate for ${formCol2} saved.` });
       setShowModal(false);
       return;
     }
 
-    const currentTabRecords = dataStore[activeModule] || [];
     const randomSuffix = Math.floor(100 + Math.random() * 900);
+    const newRecord: UnifiedRecord = {
+      id: editTargetId || `${activeModule.toLowerCase()}-${Date.now()}`,
+      reference_id: isEditing && editTargetId ? (dataStore[activeModule]?.find((r) => r.id === editTargetId)?.reference_id || `GH-2026-${randomSuffix}`) : `GH-2026-${randomSuffix}`,
+      category: activeModule,
+      col1: formCol1,
+      col2: formCol2,
+      col3: formCol3,
+      col4: formCol4,
+      col5: formCol5,
+      status: formStatus,
+      created_at: new Date().toLocaleDateString("en-IN"),
+    };
 
-    let updatedList: UnifiedRecord[] = [];
-    if (isEditing && editTargetId) {
-      updatedList = currentTabRecords.map((r) =>
-        r.id === editTargetId
-          ? { ...r, col1: formCol1, col2: formCol2, col3: formCol3, col4: formCol4, col5: formCol5, status: formStatus }
-          : r
-      );
-      setFeedback({ type: "success", text: `Updated record for ${formCol1}.` });
-    } else {
-      const newRecord: UnifiedRecord = {
-        id: `${activeModule.toLowerCase()}-${Date.now()}`,
-        reference_id: `GH-2026-${randomSuffix}`,
-        category: activeModule,
-        col1: formCol1,
-        col2: formCol2,
-        col3: formCol3,
-        col4: formCol4,
-        col5: formCol5,
-        status: formStatus,
-        created_at: new Date().toLocaleDateString("en-IN"),
-      };
-      updatedList = [newRecord, ...currentTabRecords];
-      setFeedback({ type: "success", text: `Added new entry into ${activeModule} ledger.` });
-    }
-
-    const updatedStore = { ...dataStore, [activeModule]: updatedList };
-    persistData(updatedStore);
+    const updatedStore = saveUniversalRecord(activeModule, newRecord);
+    setDataStore(updatedStore);
+    setFeedback({ type: "success", text: `Saved record in ${activeModule}.` });
     setShowModal(false);
   };
 
-  const handleDeleteEntry = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete ${name}?`)) return;
-
-    if (activeModule === "Registration") {
-      const updatedPts = sharedPatients.filter((p) => p.id !== id);
-      setSharedPatients(updatedPts);
-      localStorage.setItem("gavane_shared_patients", JSON.stringify(updatedPts));
-      setFeedback({ type: "success", text: `Removed patient ${name}.` });
-      return;
-    }
-
-    if (activeModule === "Certificates") {
-      const updatedCerts = await deleteSharedCertificate(id);
-      setSharedCertificates(updatedCerts);
-      setFeedback({ type: "success", text: `Removed certificate for ${name}.` });
-      return;
-    }
-
-    const currentTabRecords = dataStore[activeModule] || [];
-    const updatedList = currentTabRecords.filter((r) => r.id !== id);
-    const updatedStore = { ...dataStore, [activeModule]: updatedList };
-    persistData(updatedStore);
-    setFeedback({ type: "success", text: `Removed ${name}.` });
+  const handleDelete = (id: string, name: string) => {
+    if (!confirm(`Delete ${name}?`)) return;
+    const updated = deleteUniversalRecord(activeModule, id);
+    setDataStore(updated);
+    setFeedback({ type: "success", text: `Removed ${name} from ${activeModule}.` });
   };
 
   return (
@@ -527,7 +215,7 @@ export default function AdminDashboardPage() {
           />
         </div>
 
-        {/* Mobile Sidebar Drawer */}
+        {/* Mobile Drawer */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 z-50 lg:hidden flex flex-col bg-slate-950/80 backdrop-blur-sm">
             <div className="w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-left duration-200">
@@ -565,7 +253,6 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* Main Orchestrator Workspace */}
         <main className="flex-1 p-3 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 min-w-0">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-xs">
             <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 px-1 py-0.5 min-w-0">
@@ -575,7 +262,7 @@ export default function AdminDashboardPage() {
 
             <div className="flex items-center space-x-2 w-full sm:w-auto justify-end shrink-0">
               <button
-                onClick={loadAllLedgers}
+                onClick={loadData}
                 className="flex-1 sm:flex-none px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold rounded-lg transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <span>🔄</span>
@@ -583,7 +270,7 @@ export default function AdminDashboardPage() {
               </button>
 
               <button
-                onClick={handleOpenAddModal}
+                onClick={handleOpenAdd}
                 className="flex-1 sm:flex-none px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <span>+</span>
@@ -599,128 +286,157 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* Conditional Modular Tab Renderers */}
+          {/* Clean Dedicated Router */}
           {activeModule === "MASTER" && (
-            <MasterOverviewTab
+            <MasterOverview
               records={dataStore.MASTER || []}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onOpenAddModal={handleOpenAddModal}
-              onOpenEditModal={handleOpenEditModal}
-              onDeleteRecord={handleDeleteEntry}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
               activeDoctorsCount={dataStore.Doctors?.length || 2}
-              totalRegisteredPatients={sharedPatients.length}
+              totalRegisteredPatients={patients.length}
               activeOtCount={dataStore.OT?.length || 1}
             />
           )}
 
           {activeModule === "Doctors" && (
-            <DoctorsTab
+            <DoctorsManagement
               records={dataStore.Doctors || []}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onOpenEditModal={handleOpenEditModal}
-              onDeleteRecord={handleDeleteEntry}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
             />
           )}
 
           {activeModule === "Support" && (
-            <SupportTab
+            <SupportStaffManagement
               records={dataStore.Support || []}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onOpenEditModal={handleOpenEditModal}
-              onDeleteRecord={handleDeleteEntry}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
             />
           )}
 
           {activeModule === "Medical" && (
-            <MedicalTab
+            <MedicalOfficersManagement
               records={dataStore.Medical || []}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onOpenEditModal={handleOpenEditModal}
-              onDeleteRecord={handleDeleteEntry}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
             />
           )}
 
           {activeModule === "Registration" && (
-            <RegistrationTab
-              patients={sharedPatients}
+            <RegistrationView
+              patients={patients}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onDeletePatient={handleDeleteEntry}
+              onDeletePatient={async (id, name) => {
+                if (!confirm(`Delete ${name}?`)) return;
+                const updated = await deleteSharedPatient(id);
+                setPatients(updated);
+                setFeedback({ type: "success", text: `Deleted patient ${name}.` });
+              }}
+            />
+          )}
+
+          {(activeModule === "OPD" || activeModule === "IPD") && (
+            <ClinicalQueueView
+              type={activeModule as "OPD" | "IPD"}
+              records={dataStore[activeModule] || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
+            />
+          )}
+
+          {activeModule === "OT" && (
+            <SurgeryOtView
+              records={dataStore.OT || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
+            />
+          )}
+
+          {(activeModule === "Radiology" || activeModule === "Pathology") && (
+            <DiagnosticsView
+              type={activeModule as "Radiology" | "Pathology"}
+              records={dataStore[activeModule] || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
             />
           )}
 
           {activeModule === "Stock" && (
-            <StockTab
+            <InventoryView
               records={dataStore.Stock || []}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onOpenEditModal={handleOpenEditModal}
-              onDeleteRecord={handleDeleteEntry}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
             />
           )}
 
           {activeModule === "Billing" && (
-            <BillingTab
+            <BillingView
               records={dataStore.Billing || []}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onOpenEditModal={handleOpenEditModal}
-              onDeleteRecord={handleDeleteEntry}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
             />
           )}
 
           {activeModule === "Analysis" && (
-            <AnalysisTab
+            <AnalyticsConsole
               records={dataStore.Analysis || []}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onOpenEditModal={handleOpenEditModal}
-              onDeleteRecord={handleDeleteEntry}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
             />
           )}
 
           {activeModule === "Utility" && (
-            <UtilityTab
+            <BiomedicalUtility
               records={dataStore.Utility || []}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onOpenEditModal={handleOpenEditModal}
-              onDeleteRecord={handleDeleteEntry}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
             />
           )}
 
           {activeModule === "Backup" && (
-            <BackupTab
+            <ComplianceBackup
               records={dataStore.Backup || []}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onOpenEditModal={handleOpenEditModal}
-              onDeleteRecord={handleDeleteEntry}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
             />
           )}
 
           {activeModule === "Certificates" && (
-            <CertificatesTab
-              certificates={sharedCertificates}
+            <CertificatesView
+              certificates={certificates}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onDeleteCertificate={handleDeleteEntry}
-            />
-          )}
-
-          {["OPD", "IPD", "OT", "Radiology", "Pathology"].includes(activeModule) && (
-            <GenericModuleTab
-              moduleName={activeModule}
-              records={dataStore[activeModule] || []}
-              headers={getGenericHeaders(activeModule)}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onOpenEditModal={handleOpenEditModal}
-              onDeleteRecord={handleDeleteEntry}
+              onDeleteCertificate={async (id, name) => {
+                if (!confirm(`Delete certificate for ${name}?`)) return;
+                const updated = await deleteSharedCertificate(id);
+                setCertificates(updated);
+                setFeedback({ type: "success", text: `Deleted certificate for ${name}.` });
+              }}
             />
           )}
         </main>
@@ -742,9 +458,9 @@ export default function AdminDashboardPage() {
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
             </div>
 
-            <form onSubmit={handleSaveModalEntry} className="space-y-3.5">
+            <form onSubmit={handleSaveModal} className="space-y-3.5">
               <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Primary Title / Name *</label>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Primary Name / Title *</label>
                 <input
                   type="text"
                   required
@@ -756,7 +472,7 @@ export default function AdminDashboardPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Specification / Role *</label>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 2 *</label>
                   <input
                     type="text"
                     required
@@ -766,7 +482,7 @@ export default function AdminDashboardPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Department / Location *</label>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 3 *</label>
                   <input
                     type="text"
                     required
@@ -779,7 +495,7 @@ export default function AdminDashboardPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Contact / Units / Time *</label>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 4 *</label>
                   <input
                     type="text"
                     required
@@ -789,7 +505,7 @@ export default function AdminDashboardPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Fee / Expiry / Notes *</label>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 5 *</label>
                   <input
                     type="text"
                     required
@@ -801,16 +517,16 @@ export default function AdminDashboardPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Status Flag *</label>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Status *</label>
                 <select
                   value={formStatus}
                   onChange={(e) => setFormStatus(e.target.value as "Active" | "Pending" | "Completed" | "Suspended")}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                 >
                   <option value="Active">Active / Cleared</option>
-                  <option value="Pending">Pending Review / Triage</option>
-                  <option value="Completed">Completed / Cleared</option>
-                  <option value="Suspended">Suspended / Inactive</option>
+                  <option value="Pending">Pending Review</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Suspended">Suspended</option>
                 </select>
               </div>
 
@@ -822,7 +538,7 @@ export default function AdminDashboardPage() {
                   type="submit"
                   className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
                 >
-                  {isEditing ? "Save Changes" : `Commit Entry to ${activeModule}`}
+                  {isEditing ? "Save Changes" : `Commit Entry`}
                 </button>
               </div>
             </form>

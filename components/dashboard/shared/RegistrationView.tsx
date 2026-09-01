@@ -2,45 +2,42 @@
 
 import React from "react";
 import MetricsStrip from "@/components/dashboard/MetricsStrip";
-import { UnifiedRecord } from "@/app/dashboard/admin/page";
+import { SharedPatient } from "@/lib/sync/patientsSync";
 
-interface SupportTabProps {
-  records: UnifiedRecord[];
+interface RegistrationViewProps {
+  patients: SharedPatient[];
   searchTerm: string;
-  onSearchChange: (term: string) => void;
-  onOpenEditModal: (record: UnifiedRecord) => void;
-  onDeleteRecord: (id: string, name: string) => void;
+  onSearchChange: (val: string) => void;
+  onDeletePatient: (id: string, name: string) => void;
 }
 
-export default function SupportTab({
-  records,
+export default function RegistrationView({
+  patients,
   searchTerm,
   onSearchChange,
-  onOpenEditModal,
-  onDeleteRecord,
-}: SupportTabProps) {
-  const filtered = records.filter(
-    (r) =>
-      r.col1.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.col2.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.col3.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.col4.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.reference_id.toLowerCase().includes(searchTerm.toLowerCase())
+  onDeletePatient,
+}: RegistrationViewProps) {
+  const filtered = patients.filter(
+    (p) =>
+      p.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.reference_id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalCount = filtered.length;
-  const activeCount = filtered.filter((r) => r.status === "Active").length;
-  const pendingCount = filtered.filter((r) => r.status === "Pending" || r.status === "Suspended").length;
+  const activeCount = filtered.filter((p) => p.status === "Active").length;
+  const pendingCount = filtered.filter((p) => p.status === "Pending").length;
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-100 pb-4">
         <div>
           <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase">
-            Front Desk & Operations Staff
+            Universal Patient Registration Ledger
           </h2>
           <p className="text-xs text-slate-500 mt-0.5 font-medium">
-            Reception, Triage, and Nursing Roster • Showing {filtered.length} Personnel
+            Live Central Triage • Showing {filtered.length} Citizen(s)
           </p>
         </div>
 
@@ -48,7 +45,7 @@ export default function SupportTab({
           <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-xs">🔍</span>
           <input
             type="text"
-            placeholder="Search support staff..."
+            placeholder="Search registered patients..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
             className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -60,9 +57,9 @@ export default function SupportTab({
         totalCount={totalCount}
         activeCount={activeCount}
         pendingCount={pendingCount}
-        totalLabel="Total Staff Logged"
-        activeLabel="On Duty / Active"
-        pendingLabel="Pending Shift"
+        totalLabel="Total Registrations"
+        activeLabel="Triage Cleared"
+        pendingLabel="Pending Review"
       />
 
       <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-xs">
@@ -70,11 +67,11 @@ export default function SupportTab({
           <thead className="bg-[#f8fafc] text-[10px] font-black uppercase text-slate-600 border-b border-slate-200 tracking-wider">
             <tr>
               <th className="px-4 py-3.5">Ref ID</th>
-              <th className="px-4 py-3.5">Staff Full Name</th>
-              <th className="px-4 py-3.5">Designation / Role</th>
-              <th className="px-4 py-3.5">Assigned Unit / Triage</th>
-              <th className="px-4 py-3.5">Contact Mobile</th>
-              <th className="px-4 py-3.5">Shift Timings</th>
+              <th className="px-4 py-3.5">Patient Name</th>
+              <th className="px-4 py-3.5">Contact Phone</th>
+              <th className="px-4 py-3.5">Department</th>
+              <th className="px-4 py-3.5">Assigned Consultant</th>
+              <th className="px-4 py-3.5">Triage Particulars</th>
               <th className="px-4 py-3.5">Status</th>
               <th className="px-4 py-3.5 text-right">Controls</th>
             </tr>
@@ -83,41 +80,28 @@ export default function SupportTab({
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={8} className="px-5 py-10 text-center text-slate-400 font-medium">
-                  No support staff records found.
+                  No patient records registered.
                 </td>
               </tr>
             ) : (
               filtered.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="px-4 py-3.5 font-bold text-teal-700 whitespace-nowrap">{item.reference_id}</td>
-                  <td className="px-4 py-3.5 font-extrabold text-slate-900">{item.col1}</td>
-                  <td className="px-4 py-3.5 font-medium text-slate-600">{item.col2}</td>
-                  <td className="px-4 py-3.5 font-medium text-slate-700">{item.col3}</td>
-                  <td className="px-4 py-3.5 font-medium text-slate-600">{item.col4}</td>
-                  <td className="px-4 py-3.5 font-bold text-slate-800">{item.col5}</td>
+                  <td className="px-4 py-3.5 font-extrabold text-slate-900">{item.full_name}</td>
+                  <td className="px-4 py-3.5 font-medium text-slate-600">{item.phone}</td>
+                  <td className="px-4 py-3.5 font-medium text-slate-700">{item.department}</td>
+                  <td className="px-4 py-3.5 font-medium text-slate-600">{item.assigned_doctor}</td>
+                  <td className="px-4 py-3.5 font-bold text-slate-800">{item.notes || "Standard Triage"}</td>
                   <td className="px-4 py-3.5 whitespace-nowrap">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                        item.status === "Active"
-                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                          : "bg-amber-100 text-amber-800 border border-amber-200"
-                      }`}
-                    >
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
                       {item.status}
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
                     <button
-                      onClick={() => onOpenEditModal(item)}
-                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
-                      title="Edit Staff"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => onDeleteRecord(item.id, item.col1)}
+                      onClick={() => onDeletePatient(item.id, item.full_name)}
                       className="p-1.5 text-red-500 hover:bg-red-50 rounded cursor-pointer"
-                      title="Delete Staff"
+                      title="Delete Record"
                     >
                       🗑️
                     </button>

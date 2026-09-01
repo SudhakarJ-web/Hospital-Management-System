@@ -1,35 +1,32 @@
 "use client";
 
 import React from "react";
-import MetricsStrip from "@/components/dashboard/MetricsStrip";
-import { UnifiedRecord } from "@/app/dashboard/admin/page";
+import { UnifiedRecord } from "@/lib/sync/hospitalMasterSync";
 
-interface AnalysisTabProps {
+interface AnalyticsConsoleProps {
   records: UnifiedRecord[];
   searchTerm: string;
-  onSearchChange: (term: string) => void;
-  onOpenEditModal: (record: UnifiedRecord) => void;
-  onDeleteRecord: (id: string, name: string) => void;
+  onSearchChange: (val: string) => void;
+  onOpenEdit: (item: UnifiedRecord) => void;
+  onDelete: (id: string, name: string) => void;
 }
 
-export default function AnalysisTab({
+export default function AnalyticsConsole({
   records,
   searchTerm,
   onSearchChange,
-  onOpenEditModal,
-  onDeleteRecord,
-}: AnalysisTabProps) {
+  onOpenEdit,
+  onDelete,
+}: AnalyticsConsoleProps) {
   const filtered = records.filter(
     (r) =>
       r.col1.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.col2.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.col3.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.reference_id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Visual Analytics Strip */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-2">
           <div className="flex justify-between text-xs font-bold text-slate-500 uppercase">
@@ -40,7 +37,7 @@ export default function AnalysisTab({
           <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
             <div className="bg-teal-500 h-full w-[85%]"></div>
           </div>
-          <p className="text-[10px] text-slate-400">Peak flow managed without triage choke points.</p>
+          <p className="text-[10px] text-slate-400">Peak flow managed without triage bottlenecks.</p>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-2">
@@ -68,7 +65,6 @@ export default function AnalysisTab({
         </div>
       </div>
 
-      {/* KPI Table */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-100 pb-4">
           <div>
@@ -76,10 +72,9 @@ export default function AnalysisTab({
               Hospital KPI Performance Feed
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 font-medium">
-              Operational Benchmarks • Showing {filtered.length} Metric Stream(s)
+              Operational Streams • Showing {filtered.length} Metric(s)
             </p>
           </div>
-
           <div className="relative w-full md:w-72">
             <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-xs">🔍</span>
             <input
@@ -98,7 +93,7 @@ export default function AnalysisTab({
               <tr>
                 <th className="px-4 py-3.5">Metric ID</th>
                 <th className="px-4 py-3.5">KPI Indicator</th>
-                <th className="px-4 py-3.5">Volume Value</th>
+                <th className="px-4 py-3.5">Volume Metric</th>
                 <th className="px-4 py-3.5">Throughput Benchmark</th>
                 <th className="px-4 py-3.5">Observed Pacing</th>
                 <th className="px-4 py-3.5">Compliance Level</th>
@@ -116,25 +111,13 @@ export default function AnalysisTab({
                   <td className="px-4 py-3.5 font-medium text-slate-600">{item.col4}</td>
                   <td className="px-4 py-3.5 font-bold text-slate-800">{item.col5}</td>
                   <td className="px-4 py-3.5 whitespace-nowrap">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
                       {item.status}
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
-                    <button
-                      onClick={() => onOpenEditModal(item)}
-                      className="p-1.5 text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
-                      title="Edit Metric"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => onDeleteRecord(item.id, item.col1)}
-                      className="p-1.5 text-red-500 hover:bg-red-50 rounded cursor-pointer"
-                      title="Delete Metric"
-                    >
-                      🗑️
-                    </button>
+                    <button onClick={() => onOpenEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded cursor-pointer">✏️</button>
+                    <button onClick={() => onDelete(item.id, item.col1)} className="p-1.5 text-red-500 hover:bg-red-50 rounded cursor-pointer">🗑️</button>
                   </td>
                 </tr>
               ))}
