@@ -41,6 +41,26 @@ const SUPPORT_SIDEBAR_MODULES: SidebarModule[] = [
   { id: "UTILITY", label: "UTILITY & FLEET", icon: "⚙️" },
 ];
 
+export const HOSPITAL_DEPARTMENTS = [
+  "Cardiology Dept",
+  "General Medicine",
+  "General Surgery",
+  "Orthopedics Ward",
+  "Pediatrics & Neonatal",
+  "Neurology & Stroke",
+  "Radiology & Imaging",
+  "Pathology Laboratory",
+  "Trauma & Emergency",
+];
+
+export const HOSPITAL_DOCTORS = [
+  "Dr. Priya",
+  "Dr. Ananya Rao",
+  "Dr. Sudhir Gavane",
+  "Dr. Elena Rostova",
+  "Dr. Rajesh Kumar",
+];
+
 export default function SupportDashboardPage() {
   const [activeModule, setActiveModule] = useState<string>("REGISTRATION");
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -60,8 +80,8 @@ export default function SupportDashboardPage() {
   const [editTargetId, setEditTargetId] = useState<string | null>(null);
   const [formCol1, setFormCol1] = useState("");
   const [formCol2, setFormCol2] = useState("");
-  const [formCol3, setFormCol3] = useState("");
-  const [formCol4, setFormCol4] = useState("");
+  const [formCol3, setFormCol3] = useState(HOSPITAL_DEPARTMENTS[0]);
+  const [formCol4, setFormCol4] = useState(HOSPITAL_DOCTORS[0]);
   const [formCol5, setFormCol5] = useState("");
   const [formStatus, setFormStatus] = useState<"Active" | "Pending" | "Completed" | "Suspended">("Active");
 
@@ -94,9 +114,9 @@ export default function SupportDashboardPage() {
     setEditTargetId(null);
     setFormCol1("");
     setFormCol2("");
-    setFormCol3("");
-    setFormCol4("");
-    setFormCol5("");
+    setFormCol3(HOSPITAL_DEPARTMENTS[0]);
+    setFormCol4(HOSPITAL_DOCTORS[0]);
+    setFormCol5(activeModule === "REGISTRATION" ? "BP: 120/80 • Standard Triage" : "");
     setFormStatus("Active");
     setShowModal(true);
   };
@@ -113,25 +133,37 @@ export default function SupportDashboardPage() {
     setShowModal(true);
   };
 
+  const handleOpenEditPatient = (p: SharedPatient) => {
+    setIsEditing(true);
+    setEditTargetId(p.id);
+    setFormCol1(p.full_name);
+    setFormCol2(p.phone);
+    setFormCol3(p.department);
+    setFormCol4(p.assigned_doctor);
+    setFormCol5(p.notes);
+    setFormStatus(p.status);
+    setShowModal(true);
+  };
+
   const handleSaveModal = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (activeModule === "REGISTRATION") {
       const randomSuffix = Math.floor(100 + Math.random() * 900);
       const newPt: SharedPatient = {
-        id: `pat-${Date.now()}`,
-        reference_id: `GH-2026-REG${randomSuffix}`,
+        id: editTargetId || `pat-${Date.now()}`,
+        reference_id: isEditing && editTargetId ? (patients.find((p) => p.id === editTargetId)?.reference_id || `GH-2026-REG${randomSuffix}`) : `GH-2026-REG${randomSuffix}`,
         full_name: formCol1,
         phone: formCol2 || "+91 98000 00000",
-        department: formCol3 || "General OPD",
-        assigned_doctor: formCol4 || "Dr. Priya",
+        department: formCol3,
+        assigned_doctor: formCol4,
         notes: formCol5 || `Registered via Front Desk (${operatorName})`,
         status: formStatus === "Pending" ? "Pending" : "Active",
         created_at: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
       };
       const updated = await saveSharedPatient(newPt);
       setPatients(updated);
-      setFeedback({ type: "success", text: `Patient ${formCol1} registered.` });
+      setFeedback({ type: "success", text: `Patient ${formCol1} saved and synced.` });
       setShowModal(false);
       return;
     }
@@ -140,7 +172,7 @@ export default function SupportDashboardPage() {
       const randomSuffix = Math.floor(100 + Math.random() * 900);
       const certObj: SharedCertificate = {
         id: editTargetId || `cert-${Date.now()}`,
-        reference_id: `GH-2026-SUP${randomSuffix}`,
+        reference_id: isEditing && editTargetId ? (certificates.find((c) => c.id === editTargetId)?.reference_id || `GH-2026-SUP${randomSuffix}`) : `GH-2026-SUP${randomSuffix}`,
         certificate_title: formCol1,
         patient_name: formCol2,
         purpose: formCol3,
@@ -280,7 +312,7 @@ export default function SupportDashboardPage() {
                 className="flex-1 sm:flex-none px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <span>+</span>
-                <span>Add Entry</span>
+                <span>Add {activeModule === "REGISTRATION" ? "Patient" : "Entry"}</span>
               </button>
             </div>
           </div>
@@ -292,14 +324,15 @@ export default function SupportDashboardPage() {
             </div>
           )}
 
-          {/* Module Router */}
+          {/* Module Views */}
           {activeModule === "REGISTRATION" && (
             <RegistrationView
               patients={patients}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
+              onOpenEditPatient={handleOpenEditPatient}
               onDeletePatient={async (id, name) => {
-                if (!confirm(`Delete ${name}?`)) return;
+                if (!confirm(`Delete patient ${name}?`)) return;
                 const updated = await deleteSharedPatient(id);
                 setPatients(updated);
                 setFeedback({ type: "success", text: `Deleted patient ${name}.` });
@@ -390,86 +423,176 @@ export default function SupportDashboardPage() {
         <div>Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span></div>
       </footer>
 
-      {/* Dynamic Creation / Edit Modal */}
+      {/* Identical Professional Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 sm:p-6 space-y-4 my-auto max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-base font-extrabold text-slate-900">
-                {isEditing ? `Edit ${activeModule} Entry` : `New ${activeModule} Entry`}
-              </h3>
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                  Target: {activeModule} Console
+                </span>
+                <h3 className="text-base font-extrabold text-slate-900 mt-1">
+                  {activeModule === "REGISTRATION"
+                    ? isEditing
+                      ? "Edit Patient Record"
+                      : "Register New Patient Record"
+                    : isEditing
+                    ? `Edit ${activeModule} Entry`
+                    : `New ${activeModule} Entry`}
+                </h3>
+              </div>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
             </div>
 
             <form onSubmit={handleSaveModal} className="space-y-3.5">
+              {activeModule === "REGISTRATION" ? (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                      Patient Full Legal Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Mayur Jadhav"
+                      value={formCol1}
+                      onChange={(e) => setFormCol1(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                        Contact Mobile Number *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="e.g. +91 98765 43210"
+                        value={formCol2}
+                        onChange={(e) => setFormCol2(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                        Clinical Department / Specialty *
+                      </label>
+                      <select
+                        value={formCol3}
+                        onChange={(e) => setFormCol3(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                      >
+                        {HOSPITAL_DEPARTMENTS.map((dept, idx) => (
+                          <option key={idx} value={dept}>{dept}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                        Assigned Consultant Doctor *
+                      </label>
+                      <select
+                        value={formCol4}
+                        onChange={(e) => setFormCol4(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                      >
+                        {HOSPITAL_DOCTORS.map((doc, idx) => (
+                          <option key={idx} value={doc}>{doc}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                        Triage Findings / Vitals Notes
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="BP: 120/80 • Standard Triage"
+                        value={formCol5}
+                        onChange={(e) => setFormCol5(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Primary Title / Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formCol1}
+                      onChange={(e) => setFormCol1(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 2 *</label>
+                      <input
+                        type="text"
+                        required
+                        value={formCol2}
+                        onChange={(e) => setFormCol2(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 3 *</label>
+                      <input
+                        type="text"
+                        required
+                        value={formCol3}
+                        onChange={(e) => setFormCol3(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 4 *</label>
+                      <input
+                        type="text"
+                        required
+                        value={formCol4}
+                        onChange={(e) => setFormCol4(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 5 *</label>
+                      <input
+                        type="text"
+                        required
+                        value={formCol5}
+                        onChange={(e) => setFormCol5(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
               <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Primary Title / Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={formCol1}
-                  onChange={(e) => setFormCol1(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 2 *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formCol2}
-                    onChange={(e) => setFormCol2(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 3 *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formCol3}
-                    onChange={(e) => setFormCol3(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 4 *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formCol4}
-                    onChange={(e) => setFormCol4(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 5 *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formCol5}
-                    onChange={(e) => setFormCol5(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Status *</label>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Status Flag *</label>
                 <select
                   value={formStatus}
                   onChange={(e) => setFormStatus(e.target.value as "Active" | "Pending" | "Completed" | "Suspended")}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                 >
                   <option value="Active">Active / Cleared</option>
-                  <option value="Pending">Pending Review</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Suspended">Suspended</option>
+                  <option value="Pending">Pending Review / Triage</option>
+                  <option value="Completed">Completed / Cleared</option>
+                  <option value="Suspended">Suspended / Inactive</option>
                 </select>
               </div>
 
@@ -481,7 +604,7 @@ export default function SupportDashboardPage() {
                   type="submit"
                   className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
                 >
-                  {isEditing ? "Save Changes" : `Commit Entry`}
+                  {isEditing ? "Save Changes" : `Commit Entry to ${activeModule}`}
                 </button>
               </div>
             </form>

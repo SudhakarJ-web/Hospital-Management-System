@@ -11,7 +11,6 @@ import PrescriptionDispensary from "@/components/dashboard/medical/PrescriptionD
 
 import {
   getUniversalStore,
-  saveUniversalRecord,
   deleteUniversalRecord,
   UnifiedRecord,
 } from "@/lib/sync/hospitalMasterSync";
@@ -42,6 +41,7 @@ export default function DoctorDashboardPage() {
 
   const [doctorName, setDoctorName] = useState<string>("Dr. Priya");
   const [doctorEmail, setDoctorEmail] = useState<string>("priya@gmail.com");
+  const [doctorDept, setDoctorDept] = useState<string>("Cardiology Dept");
 
   const [dataStore, setDataStore] = useState<Record<string, UnifiedRecord[]>>({});
   const [patients, setPatients] = useState<SharedPatient[]>([]);
@@ -51,9 +51,10 @@ export default function DoctorDashboardPage() {
 
   // Doctor Patient Registration Modal
   const [showRegModal, setShowRegModal] = useState<boolean>(false);
+  const [isEditingPt, setIsEditingPt] = useState<boolean>(false);
+  const [editPtId, setEditPtId] = useState<string | null>(null);
   const [regName, setRegName] = useState("");
   const [regPhone, setRegPhone] = useState("");
-  const [regDept, setRegDept] = useState("General Medicine");
   const [regVitals, setRegVitals] = useState("BP: 120/80 • Cleared for Consultation");
 
   useEffect(() => {
@@ -81,29 +82,45 @@ export default function DoctorDashboardPage() {
     loadData();
   }, [loadData]);
 
+  const handleOpenAddPatient = () => {
+    setIsEditingPt(false);
+    setEditPtId(null);
+    setRegName("");
+    setRegPhone("");
+    setRegVitals("BP: 120/80 • Cleared for Consultation");
+    setShowRegModal(true);
+  };
+
+  const handleOpenEditPatient = (p: SharedPatient) => {
+    setIsEditingPt(true);
+    setEditPtId(p.id);
+    setRegName(p.full_name);
+    setRegPhone(p.phone);
+    setRegVitals(p.notes);
+    setShowRegModal(true);
+  };
+
   const handleRegisterPatientByDoctor = async (e: React.FormEvent) => {
     e.preventDefault();
     const randomSuffix = Math.floor(100 + Math.random() * 900);
-    const newPt: SharedPatient = {
-      id: `pat-${Date.now()}`,
-      reference_id: `GH-2026-REG${randomSuffix}`,
+    const ptObj: SharedPatient = {
+      id: editPtId || `pat-${Date.now()}`,
+      reference_id: isEditingPt && editPtId ? (patients.find((p) => p.id === editPtId)?.reference_id || `GH-2026-REG${randomSuffix}`) : `GH-2026-REG${randomSuffix}`,
       full_name: regName,
       phone: regPhone || "+91 98000 00000",
-      department: regDept,
+      department: doctorDept,
       assigned_doctor: doctorName,
       notes: regVitals || "Registered directly by Doctor",
       status: "Active",
       created_at: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
     };
 
-    const updated = await saveSharedPatient(newPt);
+    const updated = await saveSharedPatient(ptObj);
     setPatients(updated);
     setFeedback({
       type: "success",
-      text: `Patient ${regName} registered successfully. Available for consultation immediately.`,
+      text: `Patient ${regName} ${isEditingPt ? "updated" : "registered"} successfully. Available for consultation immediately.`,
     });
-    setRegName("");
-    setRegPhone("");
     setShowRegModal(false);
   };
 
@@ -228,7 +245,7 @@ export default function DoctorDashboardPage() {
               </button>
 
               <button
-                onClick={() => setShowRegModal(true)}
+                onClick={handleOpenAddPatient}
                 className="flex-1 sm:flex-none px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <span>+</span>
@@ -276,6 +293,7 @@ export default function DoctorDashboardPage() {
               patients={patients}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
+              onOpenEditPatient={handleOpenEditPatient}
               onDeletePatient={async (id, name) => {
                 if (!confirm(`Delete patient ${name}?`)) return;
                 const updated = await deleteSharedPatient(id);
@@ -320,7 +338,7 @@ export default function DoctorDashboardPage() {
         <div>Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span></div>
       </footer>
 
-      {/* Doctor Direct Patient Registration Modal */}
+      {/* Locked Department & Doctor Modal for Physician Walk-In */}
       {showRegModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 sm:p-6 space-y-4 my-auto max-h-[90vh] overflow-y-auto">
@@ -330,7 +348,7 @@ export default function DoctorDashboardPage() {
                   Physician Walk-In Registration
                 </span>
                 <h3 className="text-base font-extrabold text-slate-900 mt-1">
-                  Register New Patient to Clinical Queue
+                  {isEditingPt ? "Edit Patient Clinical Record" : "Register New Patient to Clinical Queue"}
                 </h3>
               </div>
               <button onClick={() => setShowRegModal(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
@@ -338,7 +356,9 @@ export default function DoctorDashboardPage() {
 
             <form onSubmit={handleRegisterPatientByDoctor} className="space-y-3.5">
               <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Patient Full Legal Name *</label>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                  Patient Full Legal Name *
+                </label>
                 <input
                   type="text"
                   required
@@ -351,7 +371,9 @@ export default function DoctorDashboardPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Contact Mobile Number *</label>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                    Contact Mobile Number *
+                  </label>
                   <input
                     type="tel"
                     required
@@ -362,29 +384,36 @@ export default function DoctorDashboardPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Clinical Department *</label>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+                    <span>Clinical Department</span>
+                    <span className="text-[9px] text-teal-700 font-extrabold bg-teal-100/70 px-1.5 rounded">🔒 Locked</span>
+                  </label>
                   <input
                     type="text"
-                    required
-                    value={regDept}
-                    onChange={(e) => setRegDept(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                    disabled
+                    value={doctorDept}
+                    className="w-full bg-slate-100 border border-slate-200 text-slate-700 font-bold rounded-lg p-2.5 text-xs cursor-not-allowed"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Assigned Physician</label>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+                  <span>Assigned Physician</span>
+                  <span className="text-[9px] text-teal-700 font-extrabold bg-teal-100/70 px-1.5 rounded">🔒 Locked</span>
+                </label>
                 <input
                   type="text"
                   disabled
                   value={doctorName}
-                  className="w-full bg-slate-100 border border-slate-200 rounded-lg p-2.5 text-xs font-bold text-slate-700 cursor-not-allowed"
+                  className="w-full bg-slate-100 border border-slate-200 text-slate-700 font-bold rounded-lg p-2.5 text-xs cursor-not-allowed"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Observed Vitals & Triage Notes</label>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                  Observed Vitals & Triage Notes
+                </label>
                 <input
                   type="text"
                   value={regVitals}
@@ -406,7 +435,7 @@ export default function DoctorDashboardPage() {
                   type="submit"
                   className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
                 >
-                  Confirm & Add to Clinical Queue
+                  {isEditingPt ? "Save Patient Changes" : "Confirm & Add to Clinical Queue"}
                 </button>
               </div>
             </form>

@@ -8,6 +8,7 @@ interface RegistrationViewProps {
   patients: SharedPatient[];
   searchTerm: string;
   onSearchChange: (val: string) => void;
+  onOpenEditPatient?: (patient: SharedPatient) => void;
   onDeletePatient: (id: string, name: string) => void;
 }
 
@@ -15,14 +16,16 @@ export default function RegistrationView({
   patients,
   searchTerm,
   onSearchChange,
+  onOpenEditPatient,
   onDeletePatient,
 }: RegistrationViewProps) {
-  const filtered = patients.filter(
+  const filtered = (patients || []).filter(
     (p) =>
-      p.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.reference_id.toLowerCase().includes(searchTerm.toLowerCase())
+      p.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.assigned_doctor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.reference_id?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalCount = filtered.length;
@@ -93,11 +96,20 @@ export default function RegistrationView({
                   <td className="px-4 py-3.5 font-medium text-slate-600">{item.assigned_doctor}</td>
                   <td className="px-4 py-3.5 font-bold text-slate-800">{item.notes || "Standard Triage"}</td>
                   <td className="px-4 py-3.5 whitespace-nowrap">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
                       {item.status}
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
+                    {onOpenEditPatient && (
+                      <button
+                        onClick={() => onOpenEditPatient(item)}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
+                        title="Edit Patient Record"
+                      >
+                        ✏️
+                      </button>
+                    )}
                     <button
                       onClick={() => onDeletePatient(item.id, item.full_name)}
                       className="p-1.5 text-red-500 hover:bg-red-50 rounded cursor-pointer"
