@@ -7,7 +7,8 @@ import DoctorClinicalForm from "@/components/dashboard/DoctorClinicalForm";
 import LedgerTable from "@/components/dashboard/shared/LedgerTable";
 import RegistrationView from "@/components/dashboard/shared/RegistrationView";
 import CertificatesView from "@/components/dashboard/shared/CertificatesView";
-import PrescriptionDispensary from "@/components/dashboard/medical/PrescriptionDispensary";
+import PrescriptionDispensary from "@/components/dashboard/shared/PrescriptionDispensary";
+import AppointmentsView from "@/components/dashboard/shared/AppointmentsView";
 
 import {
   getUniversalStore,
@@ -17,12 +18,14 @@ import {
 import { getSharedPatients, saveSharedPatient, deleteSharedPatient, SharedPatient } from "@/lib/sync/patientsSync";
 import { getSharedCertificates, deleteSharedCertificate, SharedCertificate } from "@/lib/sync/certificatesSync";
 import { getSharedPrescriptions, dispensePrescription, SharedPrescription } from "@/lib/sync/prescriptionsSync";
+import { getSharedAppointments, deleteSharedAppointment, SharedAppointment } from "@/lib/sync/appointmentsSync";
 import { supabase } from "@/lib/supabase";
 
 const DOCTOR_SIDEBAR_MODULES: SidebarModule[] = [
   { id: "OPD", label: "OPD CLINICAL DESK", icon: "🩺" },
+  { id: "APPOINTMENTS", label: "ONLINE APPOINTMENTS", icon: "📅" },
   { id: "DISPENSARY", label: "PRESCRIPTION DISPENSARY", icon: "💊" },
-  { id: "REGISTRATION", label: "REGISTRATION", icon: "👤" },
+  { id: "REGISTRATION", label: "PATIENT REGISTRATION", icon: "👤" },
   { id: "IPD", label: "IPD (IN-PATIENT)", icon: "🛏️" },
   { id: "OT", label: "OT (OPERATION THEATRE)", icon: "✂️" },
   { id: "RADIOLOGY", label: "RADIOLOGY", icon: "📡" },
@@ -34,22 +37,33 @@ const DOCTOR_SIDEBAR_MODULES: SidebarModule[] = [
   { id: "CERTIFICATES", label: "CERTIFICATES", icon: "📄" },
 ];
 
+const DOCTOR_DEPARTMENT_LOOKUP: Record<string, string> = {
+  "Dr. Priya": "Cardiology Dept",
+  "Dr. Ananya Rao": "Cardiology & Cardiac Sciences",
+  "Dr. Sudhir Gavane": "General Surgery & Trauma",
+  "Dr. Elena Rostova": "Neurology & Stroke",
+  "Dr. Rajesh Kumar": "Orthopedics & Joint Replacement",
+};
+
 export default function DoctorDashboardPage() {
   const [activeModule, setActiveModule] = useState<string>("OPD");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
+  // Doctor Profile Session State
   const [doctorName, setDoctorName] = useState<string>("Dr. Priya");
   const [doctorEmail, setDoctorEmail] = useState<string>("priya@gmail.com");
   const [doctorDept, setDoctorDept] = useState<string>("Cardiology Dept");
 
+  // Domain Store States
   const [dataStore, setDataStore] = useState<Record<string, UnifiedRecord[]>>({});
   const [patients, setPatients] = useState<SharedPatient[]>([]);
   const [certificates, setCertificates] = useState<SharedCertificate[]>([]);
   const [prescriptions, setPrescriptions] = useState<SharedPrescription[]>([]);
+  const [appointments, setAppointments] = useState<SharedAppointment[]>([]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Doctor Patient Registration Modal
+  // Doctor Direct Registration & Edit Modal State
   const [showRegModal, setShowRegModal] = useState<boolean>(false);
   const [isEditingPt, setIsEditingPt] = useState<boolean>(false);
   const [editPtId, setEditPtId] = useState<string | null>(null);
@@ -57,31 +71,42 @@ export default function DoctorDashboardPage() {
   const [regPhone, setRegPhone] = useState("");
   const [regVitals, setRegVitals] = useState("BP: 120/80 • Cleared for Consultation");
 
+  // 1. Resolve Doctor Authentication Session
   useEffect(() => {
     async function resolveDoctorSession() {
       try {
         const { data } = await supabase.auth.getUser();
         if (data?.user) {
           const metaName = data.user.user_metadata?.full_name || data.user.user_metadata?.name;
-          if (metaName) setDoctorName(metaName);
+          if (metaName) {
+            setDoctorName(metaName);
+            if (DOCTOR_DEPARTMENT_LOOKUP[metaName]) {
+              setDoctorDept(DOCTOR_DEPARTMENT_LOOKUP[metaName]);
+            }
+          }
           if (data.user.email) setDoctorEmail(data.user.email);
         }
-      } catch {}
+      } catch {
+        // Fallback to defaults
+      }
     }
     resolveDoctorSession();
   }, []);
 
+  // 2. Load Synchronized Clinical Stores
   const loadData = useCallback(async () => {
     setDataStore(getUniversalStore());
     setPatients(await getSharedPatients());
     setCertificates(await getSharedCertificates());
     setPrescriptions(await getSharedPrescriptions());
+    setAppointments(await getSharedAppointments());
   }, []);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
+  // Open Direct Walk-In Registration
   const handleOpenAddPatient = () => {
     setIsEditingPt(false);
     setEditPtId(null);
@@ -91,23 +116,25 @@ export default function DoctorDashboardPage() {
     setShowRegModal(true);
   };
 
+  // Open Edit Patient Record
   const handleOpenEditPatient = (p: SharedPatient) => {
     setIsEditingPt(true);
     setEditPtId(p.id);
     setRegName(p.full_name);
     setRegPhone(p.phone);
-    setRegVitals(p.notes);
+    setRegVitals(p.notes || "BP: 120/80 • Routine Triage");
     setShowRegModal(true);
   };
 
-  const handleRegisterPatientByDoctor = async (e: React.FormEvent) => {
+  // Commit Patient to Universal Central Ledger
+  const handleSavePatientByDoctor = async (e: React.FormEvent) => {
     e.preventDefault();
     const randomSuffix = Math.floor(100 + Math.random() * 900);
     const ptObj: SharedPatient = {
       id: editPtId || `pat-${Date.now()}`,
       reference_id: isEditingPt && editPtId ? (patients.find((p) => p.id === editPtId)?.reference_id || `GH-2026-REG${randomSuffix}`) : `GH-2026-REG${randomSuffix}`,
-      full_name: regName,
-      phone: regPhone || "+91 98000 00000",
+      full_name: regName.trim(),
+      phone: regPhone.trim() || "+91 98000 00000",
       department: doctorDept,
       assigned_doctor: doctorName,
       notes: regVitals || "Registered directly by Doctor",
@@ -119,16 +146,16 @@ export default function DoctorDashboardPage() {
     setPatients(updated);
     setFeedback({
       type: "success",
-      text: `Patient ${regName} ${isEditingPt ? "updated" : "registered"} successfully. Available for consultation immediately.`,
+      text: `Patient ${regName} ${isEditingPt ? "updated" : "registered"} successfully. Available in OPD consultation dropdown.`,
     });
     setShowRegModal(false);
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (!confirm(`Delete ${name}?`)) return;
+  const handleDeleteRecord = (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to remove ${name}?`)) return;
     const updated = deleteUniversalRecord(activeModule, id);
     setDataStore(updated);
-    setFeedback({ type: "success", text: `Removed ${name} from ${activeModule}.` });
+    setFeedback({ type: "success", text: `Removed ${name} from ${activeModule} ledger.` });
   };
 
   const getHeaders = (mod: string) => {
@@ -156,30 +183,32 @@ export default function DoctorDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col font-sans text-slate-800">
+      {/* Header */}
       <DashboardHeader
         roleIcon="🩺"
         loggedAsText={`${doctorName} (${doctorEmail})`}
-        roleSubtitle="Physician & Outpatient Clinical Workspace"
+        roleSubtitle={`${doctorDept} • Physician Console`}
         bannerText="Physician Clinical EHR & Outpatient Operations Workspace"
       />
 
-      {/* Mobile Switch Bar */}
+      {/* Mobile Switch Drawer Trigger */}
       <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-2 text-xs font-bold text-white truncate">
-          <span className="text-teal-400">🩺 Active:</span>
+          <span className="text-teal-400">🩺 Workspace:</span>
           <span className="uppercase text-teal-300 truncate">
             {DOCTOR_SIDEBAR_MODULES.find((m) => m.id === activeModule)?.label || activeModule}
           </span>
         </div>
         <button
           onClick={() => setMobileMenuOpen((prev) => !prev)}
-          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center space-x-1"
+          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center space-x-1 cursor-pointer"
         >
           <span>{mobileMenuOpen ? "✕ Close" : "☰ Switch Module"}</span>
         </button>
       </div>
 
       <div className="flex flex-1 overflow-hidden relative">
+        {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <DashboardSidebar
             modules={DOCTOR_SIDEBAR_MODULES}
@@ -192,7 +221,7 @@ export default function DoctorDashboardPage() {
           />
         </div>
 
-        {/* Mobile Drawer */}
+        {/* Mobile Slide-Over Drawer */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 z-50 lg:hidden flex flex-col bg-slate-950/80 backdrop-blur-sm">
             <div className="w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-left duration-200">
@@ -219,7 +248,7 @@ export default function DoctorDashboardPage() {
                     }`}
                   >
                     <span>{m.icon}</span>
-                    <span>{m.label}</span>
+                    <span className="truncate">{m.label}</span>
                   </button>
                 ))}
               </div>
@@ -228,11 +257,16 @@ export default function DoctorDashboardPage() {
           </div>
         )}
 
+        {/* Main Content Workspace */}
         <main className="flex-1 p-3 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 min-w-0">
+          
+          {/* Top Operational Toolbar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-xs">
             <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 px-1 py-0.5 min-w-0">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0"></span>
-              <span className="truncate">Active Workspace: <strong className="text-teal-700 uppercase">{activeModule}</strong></span>
+              <span className="truncate">
+                Active Clinical Ledger: <strong className="text-teal-700 uppercase">{activeModule}</strong>
+              </span>
             </div>
 
             <div className="flex items-center space-x-2 w-full sm:w-auto justify-end shrink-0">
@@ -254,26 +288,47 @@ export default function DoctorDashboardPage() {
             </div>
           </div>
 
+          {/* Feedback Toast */}
           {feedback && (
-            <div className="p-3 rounded-xl border text-xs font-bold bg-emerald-50 border-emerald-300 text-emerald-900 flex justify-between items-center">
+            <div className={`p-3 rounded-xl border text-xs font-bold flex justify-between items-center ${
+              feedback.type === "success" ? "bg-emerald-50 border-emerald-300 text-emerald-900" : "bg-rose-50 border-rose-300 text-rose-900"
+            }`}>
               <span>{feedback.text}</span>
-              <button onClick={() => setFeedback(null)} className="font-bold px-2 py-0.5">✕</button>
+              <button onClick={() => setFeedback(null)} className="font-bold px-2 py-0.5 hover:text-slate-900">✕</button>
             </div>
           )}
 
-          {/* OPD Clinical Form View */}
+          {/* 1. OPD Interactive Clinical Chart Console */}
           {activeModule === "OPD" && (
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 overflow-x-auto">
               <DoctorClinicalForm
                 doctorName={doctorName}
                 patients={patients}
-                onSuccess={(msg) => setFeedback({ type: "success", text: msg })}
+                onSuccess={(msg) => {
+                  setFeedback({ type: "success", text: msg });
+                  loadData();
+                }}
                 onError={(msg) => setFeedback({ type: "error", text: msg })}
               />
             </div>
           )}
 
-          {/* Prescription Dispensary View */}
+          {/* 2. Online Appointments View */}
+          {activeModule === "APPOINTMENTS" && (
+            <AppointmentsView
+              appointments={appointments}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onDeleteAppointment={async (id, name) => {
+                if (!confirm(`Cancel appointment for ${name}?`)) return;
+                const updated = await deleteSharedAppointment(id);
+                setAppointments(updated);
+                setFeedback({ type: "success", text: `Cancelled appointment for ${name}.` });
+              }}
+            />
+          )}
+
+          {/* 3. Prescription Dispensary Live Status View */}
           {activeModule === "DISPENSARY" && (
             <PrescriptionDispensary
               prescriptions={prescriptions}
@@ -282,12 +337,12 @@ export default function DoctorDashboardPage() {
               onDispense={async (id, pName) => {
                 const updated = await dispensePrescription(id, `${doctorName} (Physician Verified)`);
                 setPrescriptions(updated);
-                setFeedback({ type: "success", text: `Prescription for ${pName} marked verified & dispensed.` });
+                setFeedback({ type: "success", text: `Prescription for ${pName} verified and dispensed.` });
               }}
             />
           )}
 
-          {/* Universal Registration Ledger */}
+          {/* 4. Universal Patient Registration Ledger */}
           {activeModule === "REGISTRATION" && (
             <RegistrationView
               patients={patients}
@@ -295,7 +350,7 @@ export default function DoctorDashboardPage() {
               onSearchChange={setSearchTerm}
               onOpenEditPatient={handleOpenEditPatient}
               onDeletePatient={async (id, name) => {
-                if (!confirm(`Delete patient ${name}?`)) return;
+                if (!confirm(`Delete registered patient ${name}?`)) return;
                 const updated = await deleteSharedPatient(id);
                 setPatients(updated);
                 setFeedback({ type: "success", text: `Deleted patient ${name}.` });
@@ -303,7 +358,7 @@ export default function DoctorDashboardPage() {
             />
           )}
 
-          {/* Universal Certificates */}
+          {/* 5. Universal Medical Certificates */}
           {activeModule === "CERTIFICATES" && (
             <CertificatesView
               certificates={certificates}
@@ -318,8 +373,8 @@ export default function DoctorDashboardPage() {
             />
           )}
 
-          {/* Standard Hospital Ledger */}
-          {!["OPD", "DISPENSARY", "REGISTRATION", "CERTIFICATES"].includes(activeModule) && (
+          {/* 6. General Department & Hospital Ledgers */}
+          {!["OPD", "APPOINTMENTS", "DISPENSARY", "REGISTRATION", "CERTIFICATES"].includes(activeModule) && (
             <LedgerTable
               moduleName={activeModule}
               records={dataStore[activeModule] || []}
@@ -327,22 +382,23 @@ export default function DoctorDashboardPage() {
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
               onOpenEdit={() => {}}
-              onDelete={handleDelete}
+              onDelete={handleDeleteRecord}
             />
           )}
         </main>
       </div>
 
+      {/* Footer */}
       <footer className="bg-[#0b1b2b] text-slate-400 px-4 py-2 text-[10px] flex flex-col sm:flex-row items-center justify-between border-t border-slate-800 gap-1 text-center sm:text-left">
-        <div>Current Session :- <strong className="text-teal-400">{doctorName} ({doctorEmail}) • Pune Node</strong></div>
+        <div>Current Session :- <strong className="text-teal-400">{doctorName} ({doctorEmail}) • {doctorDept}</strong></div>
         <div>Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span></div>
       </footer>
 
-      {/* Locked Department & Doctor Modal for Physician Walk-In */}
+      {/* Doctor Walk-In Registration & Edit Modal */}
       {showRegModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 sm:p-6 space-y-4 my-auto max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b pb-3">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div>
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
                   Physician Walk-In Registration
@@ -354,7 +410,7 @@ export default function DoctorDashboardPage() {
               <button onClick={() => setShowRegModal(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
             </div>
 
-            <form onSubmit={handleRegisterPatientByDoctor} className="space-y-3.5">
+            <form onSubmit={handleSavePatientByDoctor} className="space-y-3.5">
               <div>
                 <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
                   Patient Full Legal Name *
@@ -423,7 +479,7 @@ export default function DoctorDashboardPage() {
                 />
               </div>
 
-              <div className="flex justify-end space-x-2 pt-3 border-t">
+              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowRegModal(false)}

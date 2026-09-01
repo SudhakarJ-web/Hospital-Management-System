@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { saveSharedAppointment, SharedAppointment } from "@/lib/sync/appointmentsSync";
 import { saveSharedPatient, SharedPatient } from "@/lib/sync/patientsSync";
 
@@ -8,30 +8,36 @@ interface AppointmentBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (msg: string) => void;
+  initialDoctor?: string;
+  initialDepartment?: string;
 }
 
 const DEPARTMENTS = [
-  "Cardiology Dept",
-  "General Medicine",
-  "General Surgery",
-  "Orthopedics Ward",
-  "Pediatrics & Neonatal",
-  "Neurology & Stroke",
+  "Cardiology & Cardiac Sciences",
+  "General Surgery & Trauma",
+  "General Medicine & Pediatrics",
+  "Orthopedics & Joint Replacement",
+  "Neurology & Neurosciences",
   "Radiology & Imaging",
   "Pathology Laboratory",
-  "Trauma & Emergency",
 ];
 
-const DOCTOR_MAPPING: Record<string, string[]> = {
-  "Cardiology Dept": ["Dr. Priya", "Dr. Ananya Rao"],
-  "General Medicine": ["Dr. Ananya Rao", "Dr. Elena Rostova"],
-  "General Surgery": ["Dr. Sudhir Gavane"],
-  "Orthopedics Ward": ["Dr. Sudhir Gavane", "Dr. Rajesh Kumar"],
-  "Pediatrics & Neonatal": ["Dr. Priya"],
-  "Neurology & Stroke": ["Dr. Elena Rostova"],
+const DOCTOR_TO_DEPARTMENT: Record<string, string> = {
+  "Dr. Ananya Rao": "Cardiology & Cardiac Sciences",
+  "Dr. Sudhir Gavane": "General Surgery & Trauma",
+  "Dr. Priya": "General Medicine & Pediatrics",
+  "Dr. Rajesh Kumar": "Orthopedics & Joint Replacement",
+  "Dr. Elena Rostova": "Neurology & Neurosciences",
+};
+
+const DEPARTMENT_TO_DOCTORS: Record<string, string[]> = {
+  "Cardiology & Cardiac Sciences": ["Dr. Ananya Rao", "Dr. Priya"],
+  "General Surgery & Trauma": ["Dr. Sudhir Gavane"],
+  "General Medicine & Pediatrics": ["Dr. Priya", "Dr. Ananya Rao"],
+  "Orthopedics & Joint Replacement": ["Dr. Sudhir Gavane", "Dr. Rajesh Kumar"],
+  "Neurology & Neurosciences": ["Dr. Elena Rostova"],
   "Radiology & Imaging": ["Dr. Ananya Rao"],
   "Pathology Laboratory": ["Dr. Priya"],
-  "Trauma & Emergency": ["Dr. Sudhir Gavane", "Dr. Priya"],
 };
 
 const TIME_SLOTS = [
@@ -50,24 +56,51 @@ export default function AppointmentBookingModal({
   isOpen,
   onClose,
   onSuccess,
+  initialDoctor = "Dr. Ananya Rao",
+  initialDepartment,
 }: AppointmentBookingModalProps) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [date, setDate] = useState("");
   const [timeSlot, setTimeSlot] = useState(TIME_SLOTS[2]);
-  const [department, setDepartment] = useState(DEPARTMENTS[0]);
-  const [doctor, setDoctor] = useState(DOCTOR_MAPPING[DEPARTMENTS[0]][0]);
+  const [doctor, setDoctor] = useState(initialDoctor);
+  const [department, setDepartment] = useState(
+    initialDepartment || DOCTOR_TO_DEPARTMENT[initialDoctor] || DEPARTMENTS[0]
+  );
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState<SharedAppointment | null>(null);
 
+  // Sync state whenever modal opens with a different doctor
+  useEffect(() => {
+    if (isOpen) {
+      const selectedDoc = initialDoctor || "Dr. Ananya Rao";
+      const matchingDept =
+        initialDepartment || DOCTOR_TO_DEPARTMENT[selectedDoc] || DEPARTMENTS[0];
+      setDoctor(selectedDoc);
+      setDepartment(matchingDept);
+      setConfirmedBooking(null);
+    }
+  }, [isOpen, initialDoctor, initialDepartment]);
+
   if (!isOpen) return null;
+
+  const handleDoctorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedDoc = e.target.value;
+    setDoctor(selectedDoc);
+    const matchingDept = DOCTOR_TO_DEPARTMENT[selectedDoc];
+    if (matchingDept) {
+      setDepartment(matchingDept);
+    }
+  };
 
   const handleDepartmentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedDept = e.target.value;
     setDepartment(selectedDept);
-    const availableDocs = DOCTOR_MAPPING[selectedDept] || ["Dr. Priya"];
-    setDoctor(availableDocs[0]);
+    const availableDocs = DEPARTMENT_TO_DOCTORS[selectedDept] || ["Dr. Ananya Rao"];
+    if (!availableDocs.includes(doctor)) {
+      setDoctor(availableDocs[0]);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -91,10 +124,10 @@ export default function AppointmentBookingModal({
       created_at: new Date().toLocaleDateString("en-IN"),
     };
 
-    // 1. Save to central appointments ledger
+    // 1. Save to central appointments ledger (synced with doctor & admin)
     await saveSharedAppointment(newAppointment);
 
-    // 2. Automatically register patient into triage if new
+    // 2. Automatically register patient in triage if new
     const newPt: SharedPatient = {
       id: `pat-${Date.now()}`,
       reference_id: `GH-2026-REG${randomSuffix}`,
@@ -102,7 +135,7 @@ export default function AppointmentBookingModal({
       phone: phone.trim(),
       department,
       assigned_doctor: doctor,
-      notes: `Appt: ${date} (${timeSlot}) • ${message.trim() || "Booked Online"}`,
+      notes: `Appt: ${date || "Today"} (${timeSlot}) • ${message.trim() || "Booked Online"}`,
       status: "Active",
       created_at: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
     };
@@ -112,7 +145,7 @@ export default function AppointmentBookingModal({
     setConfirmedBooking(newAppointment);
 
     if (onSuccess) {
-      onSuccess(`Appointment booked successfully! Reference ID: ${refId}`);
+      onSuccess(`Appointment booked successfully with ${doctor}! Ref: ${refId}`);
     }
   };
 
@@ -140,10 +173,10 @@ export default function AppointmentBookingModal({
                 Booking Confirmed
               </span>
               <h3 className="text-xl font-black text-slate-900 mt-2">
-                Appointment Successfully Scheduled!
+                Appointment Scheduled with {confirmedBooking.assigned_doctor}!
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Your consultation token is generated and synced with Dr. {confirmedBooking.assigned_doctor}&apos;s live OPD queue.
+                Your consultation token is active and synchronized with {confirmedBooking.assigned_doctor}&apos;s clinical OPD queue.
               </p>
             </div>
 
@@ -158,7 +191,7 @@ export default function AppointmentBookingModal({
               </div>
               <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
                 <span className="text-slate-500">Consultant Physician:</span>
-                <span className="font-bold text-slate-900">{confirmedBooking.assigned_doctor}</span>
+                <span className="font-bold text-teal-900">{confirmedBooking.assigned_doctor}</span>
               </div>
               <div className="flex justify-between border-b border-slate-200/60 pb-1.5">
                 <span className="text-slate-500">Specialty Department:</span>
@@ -175,11 +208,11 @@ export default function AppointmentBookingModal({
               type="button"
               className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer"
             >
-              Done / Close Window
+              Done / Return to Portal
             </button>
           </div>
         ) : (
-          /* Input Form */
+          /* Interactive Booking Form */
           <>
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div>
@@ -187,7 +220,7 @@ export default function AppointmentBookingModal({
                   Instant Outpatient Booking
                 </span>
                 <h3 className="text-base font-extrabold text-slate-900 mt-1">
-                  Book a Specialist Consultation
+                  Book with {doctor}
                 </h3>
               </div>
               <button
@@ -245,6 +278,21 @@ export default function AppointmentBookingModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                    Doctor / Consultant *
+                  </label>
+                  <select
+                    value={doctor}
+                    onChange={handleDoctorChange}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-bold text-teal-800 focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                  >
+                    {Object.keys(DOCTOR_TO_DEPARTMENT).map((docName, idx) => (
+                      <option key={idx} value={docName}>{docName}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
                     Specialty Department *
                   </label>
                   <select
@@ -254,21 +302,6 @@ export default function AppointmentBookingModal({
                   >
                     {DEPARTMENTS.map((dept, idx) => (
                       <option key={idx} value={dept}>{dept}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                    Doctor / Consultant *
-                  </label>
-                  <select
-                    value={doctor}
-                    onChange={(e) => setDoctor(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                  >
-                    {(DOCTOR_MAPPING[department] || ["Dr. Priya"]).map((docName, idx) => (
-                      <option key={idx} value={docName}>{docName}</option>
                     ))}
                   </select>
                 </div>
@@ -291,11 +324,11 @@ export default function AppointmentBookingModal({
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                  Symptoms / Custom Message for Doctor
+                  Symptoms / Custom Message for {doctor}
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Describe your symptoms, previous medical history, or specific requirements..."
+                  placeholder={`Describe your symptoms, previous reports, or notes for ${doctor}...`}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none resize-none"
@@ -315,7 +348,7 @@ export default function AppointmentBookingModal({
                   disabled={loading}
                   className="px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-sm transition-all cursor-pointer"
                 >
-                  {loading ? "Confirming Slot..." : "Book Now"}
+                  {loading ? "Confirming Slot..." : `Confirm Booking with ${doctor.split(" ")[1] || "Doctor"}`}
                 </button>
               </div>
             </form>

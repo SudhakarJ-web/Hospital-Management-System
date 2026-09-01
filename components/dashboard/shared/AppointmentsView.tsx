@@ -8,7 +8,7 @@ interface AppointmentsViewProps {
   appointments: SharedAppointment[];
   searchTerm: string;
   onSearchChange: (val: string) => void;
-  onDeleteAppointment: (id: string, name: string) => void;
+  onDeleteAppointment: (id: string, name: string) => void | Promise<void>;
 }
 
 export default function AppointmentsView({

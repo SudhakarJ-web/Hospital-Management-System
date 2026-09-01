@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
-  Award, ShieldCheck, HeartPulse, Stethoscope, 
+  Award, HeartPulse, Stethoscope, 
   Phone, Mail, MapPin, Star, Calendar, Clock, ArrowRight,
-  Activity, CheckCircle2, UserCheck, Sparkles, Building2
+  CheckCircle2, Sparkles
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import AppointmentBookingModal from "@/components/AppointmentBookingModal";
@@ -13,11 +13,19 @@ import AppointmentBookingModal from "@/components/AppointmentBookingModal";
 export default function HomePage() {
   const [isMounted, setIsMounted] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [selectedDoctor, setSelectedDoctor] = useState("Dr. Ananya Rao");
+  const [selectedDepartment, setSelectedDepartment] = useState("Cardiology & Cardiac Sciences");
   const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  const handleOpenDoctorBooking = (docName: string, deptName: string) => {
+    setSelectedDoctor(docName);
+    setSelectedDepartment(deptName);
+    setShowBookingModal(true);
+  };
 
   if (!isMounted) return null;
 
@@ -35,9 +43,8 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Hero Section with Fresh Cool Gradient */}
+      {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-b from-[#e6f4f7] via-[#f0f9fa] to-[#f8fafc] py-16 sm:py-24 px-4 sm:px-6 border-b border-teal-100/60">
-        {/* Subtle background decorative shapes */}
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-teal-200/40 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-1/2 -left-24 w-80 h-80 bg-cyan-200/30 rounded-full blur-3xl pointer-events-none" />
 
@@ -63,7 +70,7 @@ export default function HomePage() {
           <div className="pt-4 flex flex-col sm:flex-row justify-center items-center gap-3.5 max-w-sm sm:max-w-none mx-auto">
             <button
               type="button"
-              onClick={() => setShowBookingModal(true)}
+              onClick={() => handleOpenDoctorBooking("Dr. Ananya Rao", "Cardiology & Cardiac Sciences")}
               className="w-full sm:w-auto px-8 py-4 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-sm uppercase tracking-wider rounded-2xl shadow-lg shadow-teal-600/25 transition-all active:scale-95 flex items-center justify-center space-x-2 cursor-pointer"
             >
               <Calendar className="w-4 h-4" />
@@ -95,7 +102,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 1. Our Core Services (Reference Style Cards) */}
+      {/* 1. Core Services */}
       <section id="services" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
           <span className="text-xs font-extrabold uppercase tracking-widest text-teal-600">CLINICAL SOLUTIONS</span>
@@ -132,7 +139,7 @@ export default function HomePage() {
             </div>
             <button
               type="button"
-              onClick={() => setShowBookingModal(true)}
+              onClick={() => handleOpenDoctorBooking("Dr. Ananya Rao", "Pathology Laboratory")}
               className="mt-6 inline-flex items-center text-xs font-bold text-teal-700 hover:text-teal-900 cursor-pointer"
             >
               Book Diagnostic Scan <ArrowRight className="w-3.5 h-3.5 ml-1" />
@@ -175,7 +182,7 @@ export default function HomePage() {
             </div>
             <button
               type="button"
-              onClick={() => setShowBookingModal(true)}
+              onClick={() => handleOpenDoctorBooking("Dr. Priya", "General Medicine & Pediatrics")}
               className="mt-6 inline-flex items-center text-xs font-bold text-teal-700 hover:text-teal-900 cursor-pointer"
             >
               Consult On-Duty Doctor <ArrowRight className="w-3.5 h-3.5 ml-1" />
@@ -218,7 +225,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 2. Our Medical Facilities (Reference Style Photos) */}
+      {/* 2. Medical Facilities */}
       <section id="facilities" className="py-16 sm:py-20 px-4 sm:px-6 bg-[#f1f7f9] border-y border-slate-200/80">
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
@@ -266,7 +273,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3. Specialist Doctors List */}
+      {/* 3. Specialist Doctors List with Auto-Populating Buttons */}
       <section id="doctors" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
           <span className="text-xs font-extrabold uppercase tracking-widest text-teal-600">MEDICAL BOARD</span>
@@ -281,38 +288,40 @@ export default function HomePage() {
               degree: "MBBS, MD (Cardiology), FACC",
               dept: "Cardiology & Cardiac Sciences",
               role: "Senior Consultant Cardiologist",
-              image: "https://images.unsplash.com/photo-1594824813629-9e8c45f448ea?auto=format&fit=crop&w=600&q=80",
+              image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80",
             },
             {
               name: "Dr. Sudhir Gavane",
               degree: "MS (General & Laparoscopic Surgery), M.Ch",
               dept: "General Surgery & Trauma",
               role: "Chief Surgical Specialist",
-              image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=600&q=80",
+              image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
             },
             {
               name: "Dr. Priya",
               degree: "MD (Internal Medicine & Pediatrics)",
               dept: "General Medicine & Pediatrics",
               role: "Consultant Physician",
-              image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80",
+              image: "https://images.unsplash.com/photo-1594824813629-9e8c45f448ea?auto=format&fit=crop&w=600&q=80",
             },
           ].map((doc, idx) => (
-            <div key={idx} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm hover:shadow-lg hover:border-teal-400 transition-all text-center">
-              <div className="w-24 h-24 rounded-full mx-auto mb-4 overflow-hidden border-3 border-teal-500 shadow-md">
-                <img src={doc.image} alt={doc.name} className="w-full h-full object-cover" />
+            <div key={idx} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm hover:shadow-lg hover:border-teal-400 transition-all text-center flex flex-col justify-between">
+              <div>
+                <div className="w-24 h-24 rounded-full mx-auto mb-4 overflow-hidden border-3 border-teal-500 shadow-md">
+                  <img src={doc.image} alt={doc.name} className="w-full h-full object-cover" />
+                </div>
+                <h3 className="font-extrabold text-slate-900 text-lg">{doc.name}</h3>
+                <p className="text-xs text-teal-700 font-bold mt-0.5">{doc.degree}</p>
+                <div className="mt-3 inline-block px-3 py-1 bg-teal-50 text-teal-800 text-[11px] font-extrabold rounded-full border border-teal-200">
+                  {doc.dept}
+                </div>
+                <p className="text-xs text-slate-500 mt-2">{doc.role}</p>
               </div>
-              <h3 className="font-extrabold text-slate-900 text-lg">{doc.name}</h3>
-              <p className="text-xs text-teal-700 font-bold mt-0.5">{doc.degree}</p>
-              <div className="mt-3 inline-block px-3 py-1 bg-teal-50 text-teal-800 text-[11px] font-extrabold rounded-full border border-teal-200">
-                {doc.dept}
-              </div>
-              <p className="text-xs text-slate-500 mt-2">{doc.role}</p>
 
               <button
                 type="button"
-                onClick={() => setShowBookingModal(true)}
-                className="mt-5 w-full py-2 bg-slate-900 hover:bg-teal-600 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                onClick={() => handleOpenDoctorBooking(doc.name, doc.dept)}
+                className="mt-6 w-full py-2.5 bg-slate-900 hover:bg-teal-600 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
               >
                 Book with {doc.name.split(" ")[1] || "Doctor"}
               </button>
@@ -377,7 +386,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 5. Modern Clinical Footer */}
+      {/* 5. Footer */}
       <footer className="mt-auto bg-[#0b1b2b] text-slate-400 py-12 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 text-sm">
           <div>
@@ -416,10 +425,12 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* Shared Instant Appointment Booking Modal */}
+      {/* Auto-Populated Appointment Booking Modal */}
       <AppointmentBookingModal
         isOpen={showBookingModal}
         onClose={() => setShowBookingModal(false)}
+        initialDoctor={selectedDoctor}
+        initialDepartment={selectedDepartment}
         onSuccess={(msg) => {
           setFeedback(msg);
           setTimeout(() => setFeedback(null), 6000);
