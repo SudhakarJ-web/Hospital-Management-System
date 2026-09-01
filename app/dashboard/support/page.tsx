@@ -3,17 +3,31 @@
 import React, { useState, useEffect, useCallback } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar, { SidebarModule } from "@/components/dashboard/DashboardSidebar";
-import LedgerTable from "@/components/dashboard/shared/LedgerTable";
+
+// Universal Shared Views
 import RegistrationView from "@/components/dashboard/shared/RegistrationView";
 import CertificatesView from "@/components/dashboard/shared/CertificatesView";
+import ClinicalQueueView from "@/components/dashboard/shared/ClinicalQueueView";
+import BillingView from "@/components/dashboard/shared/BillingView";
+
+// Support-Dedicated Views
+import DischargeClearance from "@/components/dashboard/support/DischargeClearance";
+import VisitorPassDesk from "@/components/dashboard/support/VisitorPassDesk";
+import SupportUtility from "@/components/dashboard/support/SupportUtility";
 
 import {
   getUniversalStore,
+  saveUniversalRecord,
   deleteUniversalRecord,
   UnifiedRecord,
 } from "@/lib/sync/hospitalMasterSync";
-import { getSharedPatients, deleteSharedPatient, SharedPatient } from "@/lib/sync/patientsSync";
-import { getSharedCertificates, deleteSharedCertificate, SharedCertificate } from "@/lib/sync/certificatesSync";
+import { getSharedPatients, saveSharedPatient, deleteSharedPatient, SharedPatient } from "@/lib/sync/patientsSync";
+import {
+  getSharedCertificates,
+  saveSharedCertificate,
+  deleteSharedCertificate,
+  SharedCertificate,
+} from "@/lib/sync/certificatesSync";
 import { supabase } from "@/lib/supabase";
 
 const SUPPORT_SIDEBAR_MODULES: SidebarModule[] = [
@@ -22,13 +36,14 @@ const SUPPORT_SIDEBAR_MODULES: SidebarModule[] = [
   { id: "BILLING", label: "FRONT DESK BILLING & UPI", icon: "💳" },
   { id: "IPD_ADMISSION", label: "IPD ADMISSIONS & BEDS", icon: "🛏️" },
   { id: "DISCHARGE", label: "DISCHARGE CLEARANCE DESK", icon: "🚪" },
+  { id: "VISITOR_PASS", label: "VISITOR & ATTENDANT PASS", icon: "🏷️" },
   { id: "CERTIFICATES", label: "MEDICAL CERTIFICATES", icon: "📄" },
-  { id: "HELPDESK", label: "HELPDESK & UTILITY", icon: "⚙️" },
+  { id: "UTILITY", label: "UTILITY & FLEET", icon: "⚙️" },
 ];
 
 export default function SupportDashboardPage() {
   const [activeModule, setActiveModule] = useState<string>("REGISTRATION");
-  const [searchTerm, setSearchTerm] = useState<string>("" );
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   const [operatorName, setOperatorName] = useState<string>("Rajesh Patil");
@@ -38,6 +53,17 @@ export default function SupportDashboardPage() {
   const [patients, setPatients] = useState<SharedPatient[]>([]);
   const [certificates, setCertificates] = useState<SharedCertificate[]>([]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Dynamic Add / Edit Modal State
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editTargetId, setEditTargetId] = useState<string | null>(null);
+  const [formCol1, setFormCol1] = useState("");
+  const [formCol2, setFormCol2] = useState("");
+  const [formCol3, setFormCol3] = useState("");
+  const [formCol4, setFormCol4] = useState("");
+  const [formCol5, setFormCol5] = useState("");
+  const [formStatus, setFormStatus] = useState<"Active" | "Pending" | "Completed" | "Suspended">("Active");
 
   useEffect(() => {
     async function resolveSession() {
@@ -63,28 +89,100 @@ export default function SupportDashboardPage() {
     loadData();
   }, [loadData]);
 
-  const handleDelete = (id: string, name: string) => {
-    if (!confirm(`Delete record for ${name}?`)) return;
-    const updated = deleteUniversalRecord(activeModule, id);
-    setDataStore(updated);
-    setFeedback({ type: "success", text: `Removed ${name}.` });
+  const handleOpenAdd = () => {
+    setIsEditing(false);
+    setEditTargetId(null);
+    setFormCol1("");
+    setFormCol2("");
+    setFormCol3("");
+    setFormCol4("");
+    setFormCol5("");
+    setFormStatus("Active");
+    setShowModal(true);
   };
 
-  const getHeaders = (mod: string) => {
-    switch (mod) {
-      case "OPD_QUEUE":
-        return ["Token / ID", "Patient Name", "Token Number", "Consultation Specialty", "Observed Vitals", "Assigned Doctor", "Status", "Controls"];
-      case "BILLING":
-        return ["Invoice ID", "Patient Name", "Receipt / Bill Ref", "Service Description", "Net Amount (₹)", "Payment Mode", "Status", "Controls"];
-      case "IPD_ADMISSION":
-        return ["Admission ID", "Patient Name", "Bed & Ward", "Department Ward", "Attending Consultant", "Admission Particulars", "Status", "Controls"];
-      case "DISCHARGE":
-        return ["Discharge ID", "Patient Name", "Summary Reference", "Ward / Bed", "Attending Physician", "Clearance Checklist", "Status", "Controls"];
-      case "HELPDESK":
-        return ["Ticket ID", "Inquiry / Request", "Contact", "Location / Ward", "Assigned Staff", "Dispatch Status", "Status", "Controls"];
-      default:
-        return ["Ref ID", "Subject", "Detail", "Department", "Assigned Person", "Particulars", "Status", "Controls"];
+  const handleOpenEdit = (item: UnifiedRecord) => {
+    setIsEditing(true);
+    setEditTargetId(item.id);
+    setFormCol1(item.col1);
+    setFormCol2(item.col2);
+    setFormCol3(item.col3);
+    setFormCol4(item.col4);
+    setFormCol5(item.col5);
+    setFormStatus(item.status);
+    setShowModal(true);
+  };
+
+  const handleSaveModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (activeModule === "REGISTRATION") {
+      const randomSuffix = Math.floor(100 + Math.random() * 900);
+      const newPt: SharedPatient = {
+        id: `pat-${Date.now()}`,
+        reference_id: `GH-2026-REG${randomSuffix}`,
+        full_name: formCol1,
+        phone: formCol2 || "+91 98000 00000",
+        department: formCol3 || "General OPD",
+        assigned_doctor: formCol4 || "Dr. Priya",
+        notes: formCol5 || `Registered via Front Desk (${operatorName})`,
+        status: formStatus === "Pending" ? "Pending" : "Active",
+        created_at: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+      };
+      const updated = await saveSharedPatient(newPt);
+      setPatients(updated);
+      setFeedback({ type: "success", text: `Patient ${formCol1} registered.` });
+      setShowModal(false);
+      return;
     }
+
+    if (activeModule === "CERTIFICATES") {
+      const randomSuffix = Math.floor(100 + Math.random() * 900);
+      const certObj: SharedCertificate = {
+        id: editTargetId || `cert-${Date.now()}`,
+        reference_id: `GH-2026-SUP${randomSuffix}`,
+        certificate_title: formCol1,
+        patient_name: formCol2,
+        purpose: formCol3,
+        issued_date: formCol4 || "28/08/2026",
+        authorizing_doctor: formCol5 || "Dr. Priya",
+        status: formStatus,
+        created_at: new Date().toLocaleDateString("en-IN"),
+      };
+      const updatedCerts = await saveSharedCertificate(certObj);
+      setCertificates(updatedCerts);
+      setFeedback({ type: "success", text: `Certificate for ${formCol2} saved.` });
+      setShowModal(false);
+      return;
+    }
+
+    const targetKey = activeModule === "UTILITY" ? "Utility" : activeModule === "OPD_QUEUE" ? "OPD" : activeModule === "IPD_ADMISSION" ? "IPD" : activeModule === "BILLING" ? "Billing" : activeModule;
+    const randomSuffix = Math.floor(100 + Math.random() * 900);
+    const newRecord: UnifiedRecord = {
+      id: editTargetId || `${targetKey.toLowerCase()}-${Date.now()}`,
+      reference_id: isEditing && editTargetId ? (dataStore[targetKey]?.find((r) => r.id === editTargetId)?.reference_id || `GH-2026-${randomSuffix}`) : `GH-2026-${randomSuffix}`,
+      category: targetKey,
+      col1: formCol1,
+      col2: formCol2,
+      col3: formCol3,
+      col4: formCol4,
+      col5: formCol5,
+      status: formStatus,
+      created_at: new Date().toLocaleDateString("en-IN"),
+    };
+
+    const updatedStore = saveUniversalRecord(targetKey, newRecord);
+    setDataStore(updatedStore);
+    setFeedback({ type: "success", text: `Saved entry in ${activeModule}.` });
+    setShowModal(false);
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    if (!confirm(`Delete record for ${name}?`)) return;
+    const targetKey = activeModule === "UTILITY" ? "Utility" : activeModule === "OPD_QUEUE" ? "OPD" : activeModule === "IPD_ADMISSION" ? "IPD" : activeModule === "BILLING" ? "Billing" : activeModule;
+    const updated = deleteUniversalRecord(targetKey, id);
+    setDataStore(updated);
+    setFeedback({ type: "success", text: `Removed ${name}.` });
   };
 
   return (
@@ -165,7 +263,7 @@ export default function SupportDashboardPage() {
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-xs">
             <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 px-1 py-0.5 min-w-0">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0"></span>
-              <span className="truncate">Active Front Desk Workspace: <strong className="text-teal-700 uppercase">{activeModule}</strong></span>
+              <span className="truncate">Active Workspace: <strong className="text-teal-700 uppercase">{activeModule}</strong></span>
             </div>
 
             <div className="flex items-center space-x-2 w-full sm:w-auto justify-end shrink-0">
@@ -175,6 +273,14 @@ export default function SupportDashboardPage() {
               >
                 <span>🔄</span>
                 <span>Sync Live Data</span>
+              </button>
+
+              <button
+                onClick={handleOpenAdd}
+                className="flex-1 sm:flex-none px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+              >
+                <span>+</span>
+                <span>Add Entry</span>
               </button>
             </div>
           </div>
@@ -186,17 +292,70 @@ export default function SupportDashboardPage() {
             </div>
           )}
 
+          {/* Module Router */}
           {activeModule === "REGISTRATION" && (
             <RegistrationView
               patients={patients}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
               onDeletePatient={async (id, name) => {
-                if (!confirm(`Delete patient ${name}?`)) return;
+                if (!confirm(`Delete ${name}?`)) return;
                 const updated = await deleteSharedPatient(id);
                 setPatients(updated);
                 setFeedback({ type: "success", text: `Deleted patient ${name}.` });
               }}
+            />
+          )}
+
+          {activeModule === "OPD_QUEUE" && (
+            <ClinicalQueueView
+              type="OPD"
+              records={dataStore.OPD || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
+            />
+          )}
+
+          {activeModule === "BILLING" && (
+            <BillingView
+              records={dataStore.Billing || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
+            />
+          )}
+
+          {activeModule === "IPD_ADMISSION" && (
+            <ClinicalQueueView
+              type="IPD"
+              records={dataStore.IPD || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
+            />
+          )}
+
+          {activeModule === "DISCHARGE" && (
+            <DischargeClearance
+              records={dataStore.DISCHARGE || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
+            />
+          )}
+
+          {activeModule === "VISITOR_PASS" && (
+            <VisitorPassDesk
+              records={dataStore.VISITOR_PASS || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
             />
           )}
 
@@ -214,14 +373,12 @@ export default function SupportDashboardPage() {
             />
           )}
 
-          {!["REGISTRATION", "CERTIFICATES"].includes(activeModule) && (
-            <LedgerTable
-              moduleName={activeModule}
-              records={dataStore[activeModule] || []}
-              headers={getHeaders(activeModule)}
+          {activeModule === "UTILITY" && (
+            <SupportUtility
+              records={dataStore.Utility || []}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onOpenEdit={() => {}}
+              onOpenEdit={handleOpenEdit}
               onDelete={handleDelete}
             />
           )}
@@ -232,6 +389,105 @@ export default function SupportDashboardPage() {
         <div>Current Session :- <strong className="text-teal-400">{operatorName} ({operatorEmail}) • Front Desk Node</strong></div>
         <div>Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span></div>
       </footer>
+
+      {/* Dynamic Creation / Edit Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 sm:p-6 space-y-4 my-auto max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="text-base font-extrabold text-slate-900">
+                {isEditing ? `Edit ${activeModule} Entry` : `New ${activeModule} Entry`}
+              </h3>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
+            </div>
+
+            <form onSubmit={handleSaveModal} className="space-y-3.5">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Primary Title / Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={formCol1}
+                  onChange={(e) => setFormCol1(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 2 *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formCol2}
+                    onChange={(e) => setFormCol2(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 3 *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formCol3}
+                    onChange={(e) => setFormCol3(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 4 *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formCol4}
+                    onChange={(e) => setFormCol4(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 5 *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formCol5}
+                    onChange={(e) => setFormCol5(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Status *</label>
+                <select
+                  value={formStatus}
+                  onChange={(e) => setFormStatus(e.target.value as "Active" | "Pending" | "Completed" | "Suspended")}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                >
+                  <option value="Active">Active / Cleared</option>
+                  <option value="Pending">Pending Review</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Suspended">Suspended</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t">
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-slate-100 text-xs font-bold rounded-lg cursor-pointer">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
+                >
+                  {isEditing ? "Save Changes" : `Commit Entry`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
