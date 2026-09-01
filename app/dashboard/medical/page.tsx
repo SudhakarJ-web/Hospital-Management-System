@@ -3,26 +3,39 @@
 import React, { useState, useEffect, useCallback } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar, { SidebarModule } from "@/components/dashboard/DashboardSidebar";
-import LedgerTable from "@/components/dashboard/shared/LedgerTable";
+
+// Universal Shared & Dedicated Medical Views
+import InventoryView from "@/components/dashboard/shared/InventoryView";
+import PrescriptionDispensary from "@/components/dashboard/medical/PrescriptionDispensary";
+import DiagnosticReagents from "@/components/dashboard/medical/DiagnosticReagents";
+import RadiologyConsumables from "@/components/dashboard/medical/RadiologyConsumables";
+import SupplierPurchaseOrders from "@/components/dashboard/medical/SupplierPurchaseOrders";
+import ExpiredQuarantine from "@/components/dashboard/medical/ExpiredQuarantine";
 
 import {
   getUniversalStore,
+  saveUniversalRecord,
   deleteUniversalRecord,
   UnifiedRecord,
 } from "@/lib/sync/hospitalMasterSync";
+import {
+  getSharedPrescriptions,
+  dispensePrescription,
+  SharedPrescription,
+} from "@/lib/sync/prescriptionsSync";
 import { supabase } from "@/lib/supabase";
 
 const MEDICAL_SIDEBAR_MODULES: SidebarModule[] = [
-  { id: "Stock", label: "PHARMACY STOCK & DRUGS", icon: "💊" },
+  { id: "PHARMACY_STOCK", label: "PHARMACY STOCK & DRUGS", icon: "💊" },
   { id: "DISPENSARY", label: "PRESCRIPTION DISPENSARY", icon: "📦" },
-  { id: "Pathology", label: "PATHOLOGY REAGENTS & KITS", icon: "🔬" },
-  { id: "Radiology", label: "RADIOLOGY FILMS & CONSUMABLES", icon: "📡" },
+  { id: "PATHOLOGY_LAB", label: "PATHOLOGY REAGENTS & KITS", icon: "🔬" },
+  { id: "RADIOLOGY_SUPPLIES", label: "RADIOLOGY FILMS & CONSUMABLES", icon: "📡" },
   { id: "SUPPLIERS", label: "SUPPLIERS & PO ORDERS", icon: "🚚" },
   { id: "EXPIRED_LEDGER", label: "AUDIT & EXPIRED LOGS", icon: "⚠️" },
 ];
 
 export default function MedicalDashboardPage() {
-  const [activeModule, setActiveModule] = useState<string>("Stock");
+  const [activeModule, setActiveModule] = useState<string>("PHARMACY_STOCK");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
@@ -30,7 +43,19 @@ export default function MedicalDashboardPage() {
   const [pharmacistEmail, setPharmacistEmail] = useState<string>("medical@gavanehospital.in");
 
   const [dataStore, setDataStore] = useState<Record<string, UnifiedRecord[]>>({});
+  const [prescriptions, setPrescriptions] = useState<SharedPrescription[]>([]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Dynamic Add / Edit Modal State
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editTargetId, setEditTargetId] = useState<string | null>(null);
+  const [formCol1, setFormCol1] = useState("");
+  const [formCol2, setFormCol2] = useState("");
+  const [formCol3, setFormCol3] = useState("");
+  const [formCol4, setFormCol4] = useState("");
+  const [formCol5, setFormCol5] = useState("");
+  const [formStatus, setFormStatus] = useState<"Active" | "Pending" | "Completed" | "Suspended">("Active");
 
   useEffect(() => {
     async function resolveSession() {
@@ -46,38 +71,78 @@ export default function MedicalDashboardPage() {
     resolveSession();
   }, []);
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     setDataStore(getUniversalStore());
+    setPrescriptions(await getSharedPrescriptions());
   }, []);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const handleDelete = (id: string, name: string) => {
-    if (!confirm(`Retire ${name}?`)) return;
-    const updated = deleteUniversalRecord(activeModule, id);
-    setDataStore(updated);
-    setFeedback({ type: "success", text: `Removed ${name} from ${activeModule}.` });
+  const handleDispense = async (id: string, patientName: string) => {
+    const updated = await dispensePrescription(id, pharmacistName);
+    setPrescriptions(updated);
+    setFeedback({
+      type: "success",
+      text: `Prescription for ${patientName} fulfilled and dispensed successfully.`,
+    });
   };
 
-  const getHeaders = (mod: string) => {
-    switch (mod) {
-      case "Stock":
-        return ["SKU / Item ID", "Medication & Strength", "SKU / Package Type", "Dosage Form", "Stock Units & MRP", "Batch & Expiry", "Status", "Actions"];
-      case "DISPENSARY":
-        return ["Rx ID", "Patient Name", "Rx Reference", "Prescribed Meds", "Total Quantity", "Prescribing Doctor", "Status", "Actions"];
-      case "Pathology":
-        return ["Reagent ID", "Assay / Kit Name", "SKU Identifier", "Analyzer Instrument", "Volume / Tests", "Lot & Expiry", "Status", "Actions"];
-      case "Radiology":
-        return ["Item ID", "Film / Contrast Material", "SKU Reference", "Modality Device", "Inventory Count", "Lot & Expiry", "Status", "Actions"];
-      case "SUPPLIERS":
-        return ["PO Number", "Distributor Agency", "PO Reference ID", "Consignment Particulars", "Invoice Total", "Tracking Status", "Status", "Actions"];
-      case "EXPIRED_LEDGER":
-        return ["Audit Ref", "Quarantined Item", "SKU Code", "Batch Code Number", "Condemned Quantity", "Disposal Protocol", "Status", "Actions"];
-      default:
-        return ["Item ID", "Name", "Code", "Section", "Quantity / Price", "Expiry / Details", "Status", "Actions"];
-    }
+  const handleOpenAdd = () => {
+    setIsEditing(false);
+    setEditTargetId(null);
+    setFormCol1("");
+    setFormCol2("");
+    setFormCol3("");
+    setFormCol4("");
+    setFormCol5("");
+    setFormStatus("Active");
+    setShowModal(true);
+  };
+
+  const handleOpenEdit = (item: UnifiedRecord) => {
+    setIsEditing(true);
+    setEditTargetId(item.id);
+    setFormCol1(item.col1);
+    setFormCol2(item.col2);
+    setFormCol3(item.col3);
+    setFormCol4(item.col4);
+    setFormCol5(item.col5);
+    setFormStatus(item.status);
+    setShowModal(true);
+  };
+
+  const handleSaveModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetKey = activeModule === "PHARMACY_STOCK" ? "Stock" : activeModule === "PATHOLOGY_LAB" ? "Pathology" : activeModule === "RADIOLOGY_SUPPLIES" ? "Radiology" : activeModule;
+
+    const randomSuffix = Math.floor(100 + Math.random() * 900);
+    const newRecord: UnifiedRecord = {
+      id: editTargetId || `${targetKey.toLowerCase()}-${Date.now()}`,
+      reference_id: isEditing && editTargetId ? (dataStore[targetKey]?.find((r) => r.id === editTargetId)?.reference_id || `MED-2026-${randomSuffix}`) : `MED-2026-${randomSuffix}`,
+      category: targetKey,
+      col1: formCol1,
+      col2: formCol2,
+      col3: formCol3,
+      col4: formCol4,
+      col5: formCol5,
+      status: formStatus,
+      created_at: new Date().toLocaleDateString("en-IN"),
+    };
+
+    const updatedStore = saveUniversalRecord(targetKey, newRecord);
+    setDataStore(updatedStore);
+    setFeedback({ type: "success", text: `Item saved in ${activeModule}.` });
+    setShowModal(false);
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    if (!confirm(`Retire ${name}?`)) return;
+    const targetKey = activeModule === "PHARMACY_STOCK" ? "Stock" : activeModule === "PATHOLOGY_LAB" ? "Pathology" : activeModule === "RADIOLOGY_SUPPLIES" ? "Radiology" : activeModule;
+    const updated = deleteUniversalRecord(targetKey, id);
+    setDataStore(updated);
+    setFeedback({ type: "success", text: `Removed ${name} from ledger.` });
   };
 
   return (
@@ -169,6 +234,16 @@ export default function MedicalDashboardPage() {
                 <span>🔄</span>
                 <span>Sync Stock</span>
               </button>
+
+              {activeModule !== "DISPENSARY" && (
+                <button
+                  onClick={handleOpenAdd}
+                  className="flex-1 sm:flex-none px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+                >
+                  <span>+</span>
+                  <span>Add Item</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -179,22 +254,171 @@ export default function MedicalDashboardPage() {
             </div>
           )}
 
-          <LedgerTable
-            moduleName={activeModule}
-            records={dataStore[activeModule] || []}
-            headers={getHeaders(activeModule)}
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            onOpenEdit={() => {}}
-            onDelete={handleDelete}
-          />
+          {/* Module Views */}
+          {activeModule === "PHARMACY_STOCK" && (
+            <InventoryView
+              records={dataStore.Stock || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
+            />
+          )}
+
+          {activeModule === "DISPENSARY" && (
+            <PrescriptionDispensary
+              prescriptions={prescriptions}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onDispense={handleDispense}
+            />
+          )}
+
+          {activeModule === "PATHOLOGY_LAB" && (
+            <DiagnosticReagents
+              records={dataStore.Pathology || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
+            />
+          )}
+
+          {activeModule === "RADIOLOGY_SUPPLIES" && (
+            <RadiologyConsumables
+              records={dataStore.Radiology || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
+            />
+          )}
+
+          {activeModule === "SUPPLIERS" && (
+            <SupplierPurchaseOrders
+              records={dataStore.SUPPLIERS || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
+            />
+          )}
+
+          {activeModule === "EXPIRED_LEDGER" && (
+            <ExpiredQuarantine
+              records={dataStore.EXPIRED_LEDGER || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEdit={handleOpenEdit}
+              onDelete={handleDelete}
+            />
+          )}
         </main>
       </div>
 
       <footer className="bg-[#0b1b2b] text-slate-400 px-4 py-2 text-[10px] flex flex-col sm:flex-row items-center justify-between border-t border-slate-800 gap-1 text-center sm:text-left">
-        <div>Current Session :- <strong className="text-teal-400">{pharmacistName} ({pharmacistEmail}) • Pharmacy Node</strong></div>
+        <div>Current Session :- <strong className="text-teal-400">{pharmacistName} ({pharmacistEmail}) • Pharmacy Depot</strong></div>
         <div>Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span></div>
       </footer>
+
+      {/* Unified Add / Edit Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 sm:p-6 space-y-4 my-auto max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="text-base font-extrabold text-slate-900">
+                {isEditing ? `Edit ${activeModule} Item` : `Add Item to ${activeModule}`}
+              </h3>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
+            </div>
+
+            <form onSubmit={handleSaveModal} className="space-y-3.5">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Item / Reagent Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={formCol1}
+                  onChange={(e) => setFormCol1(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">SKU / Code *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formCol2}
+                    onChange={(e) => setFormCol2(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Dosage Form / Section *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formCol3}
+                    onChange={(e) => setFormCol3(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Stock Balance & Price *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formCol4}
+                    onChange={(e) => setFormCol4(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Batch / Expiry / Notes *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formCol5}
+                    onChange={(e) => setFormCol5(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Stock Flag *</label>
+                <select
+                  value={formStatus}
+                  onChange={(e) => setFormStatus(e.target.value as "Active" | "Pending" | "Completed" | "Suspended")}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                >
+                  <option value="Active">In Stock / Available</option>
+                  <option value="Pending">Low Stock / Reorder</option>
+                  <option value="Completed">Cleared / Filled</option>
+                  <option value="Suspended">Quarantined / Expired</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-3 border-t">
+                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-slate-100 text-xs font-bold rounded-lg cursor-pointer">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
+                >
+                  {isEditing ? "Save Changes" : `Commit Entry`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
