@@ -7,9 +7,12 @@ import {
   Phone, Mail, MapPin, Star
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import AppointmentBookingModal from "@/components/AppointmentBookingModal";
 
 export default function HomePage() {
   const [isMounted, setIsMounted] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -21,6 +24,14 @@ export default function HomePage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col selection:bg-teal-500 selection:text-white">
       {/* Responsive Navbar */}
       <Navbar />
+
+      {/* Feedback Toast */}
+      {feedback && (
+        <div className="fixed top-16 right-4 z-50 p-3.5 bg-emerald-600 text-white rounded-xl shadow-xl text-xs font-bold flex items-center space-x-2 animate-in slide-in-from-top duration-200">
+          <span>✓ {feedback}</span>
+          <button onClick={() => setFeedback(null)} className="ml-2 font-bold hover:text-slate-200">✕</button>
+        </div>
+      )}
 
       {/* Hero Section */}
       <section className="relative py-14 sm:py-20 text-center px-4 sm:px-6 bg-gradient-to-b from-slate-900 to-slate-950">
@@ -34,17 +45,23 @@ export default function HomePage() {
           Providing end-to-end hospital administration, clinical management, real-time doctor portals, patient OPD/IPD tracking, and automated billing workflows.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 max-w-md mx-auto sm:max-w-none">
-          <Link
-            href="/contact"
-            className="px-6 py-3 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-teal-500/20 transition-all active:scale-95 text-center text-sm"
+          <button
+            type="button"
+            onClick={() => setShowBookingModal(true)}
+            className="px-6 py-3 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-teal-500/20 transition-all active:scale-95 text-center text-sm cursor-pointer"
           >
             Book Appointment
+          </button>
+          <Link
+            href="/dashboard/doctor"
+            className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 font-bold rounded-xl transition-all active:scale-95 text-center text-sm"
+          >
+            Staff Portal Sign In
           </Link>
-          
         </div>
       </section>
 
-      {/* 1. Core Services */}
+      {/* Core Services */}
       <section id="services" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 border-l-4 border-cyan-500 pl-3">
           Our Core Services
@@ -68,7 +85,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 2. About Us with Real Campus Facility Image */}
+      {/* About Us Preview */}
       <section className="py-12 sm:py-16 px-4 sm:px-6 bg-slate-900/50 border-y border-slate-800">
         <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-8 md:gap-12 items-center">
           <div>
@@ -98,89 +115,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3. Chairman's Message with Real Profile Image */}
-      <section className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto w-full">
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 grid md:grid-cols-3 gap-6 md:gap-8 items-center">
-          <div className="relative rounded-2xl overflow-hidden h-52 sm:h-56 border border-slate-700/60">
-            <img
-              src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=800&q=80"
-              alt="Dr. A. Gavane - Founder & Chairman"
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="md:col-span-2 space-y-2">
-            <blockquote className="text-base sm:text-lg italic text-slate-200 leading-relaxed">
-              &quot;Our mission is to make world-class healthcare accessible, affordable, and compassionate for every individual.&quot;
-            </blockquote>
-            <h3 className="text-lg sm:text-xl font-bold text-white pt-2">Dr. A. Gavane</h3>
-            <p className="text-cyan-400 text-xs sm:text-sm">MD, FRCS — Founder & Chairman</p>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. Specialist Doctors with Real Clinical Portraits */}
-      <section id="doctors" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto w-full">
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 border-l-4 border-cyan-500 pl-3">
-          Our Specialist Doctors
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {[
-            {
-              name: "Dr. Sarah Jenkins",
-              degree: "MD, Cardiology",
-              spec: "Senior Cardiologist",
-              image: "https://plus.unsplash.com/premium_photo-1661580574627-9211124e5c3f?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-            },
-            {
-              name: "Dr. Rajesh Kumar",
-              degree: "MS, Orthopedics",
-              spec: "Joint Replacement Specialist",
-              image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=600&q=80",
-            },
-            {
-              name: "Dr. Elena Rostova",
-              degree: "DM, Neurology",
-              spec: "Neurologist",
-              image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80",
-            },
-          ].map((doc, idx) => (
-            <div key={idx} className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-center hover:border-cyan-500/40 transition-colors">
-              <div className="w-24 h-24 rounded-full mx-auto mb-4 overflow-hidden border-2 border-teal-500/40 shadow-lg">
-                <img src={doc.image} alt={doc.name} className="w-full h-full object-cover" />
-              </div>
-              <h3 className="font-bold text-white text-base sm:text-lg">{doc.name}</h3>
-              <p className="text-xs text-slate-400 mt-0.5">{doc.degree}</p>
-              <span className="inline-block mt-3 px-3 py-1 bg-slate-800 text-cyan-400 text-[11px] font-semibold rounded-full border border-slate-700">
-                {doc.spec}
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 5. Centres of Excellence */}
-      <section id="centres" className="py-12 sm:py-16 px-4 sm:px-6 bg-slate-900/50 border-y border-slate-800">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 border-l-4 border-cyan-500 pl-3">
-            Centres of Excellence
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-            {[
-              { title: "Cardiology & Cardiac Surgery", desc: "Comprehensive multi-disciplinary cardiac catheterization, coronary interventions, and CCU telemetry." },
-              { title: "Oncology & Cancer Care", desc: "Evidence-based medical, surgical, and supportive oncology with certified infusion suites." },
-              { title: "Neurosciences & Neurosurgery", desc: "Advanced neuro-trauma care, stroke intervention protocol, and microsurgical brain suites." },
-            ].map((centre, i) => (
-              <div key={i} className="p-5 sm:p-6 bg-slate-900 border border-slate-800 rounded-xl">
-                <HeartPulse className="text-cyan-400 w-7 h-7 mb-2" />
-                <h3 className="font-bold text-white text-base sm:text-lg">{centre.title}</h3>
-                <p className="text-xs text-slate-400 mt-2 leading-relaxed">{centre.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 6. Facilities & Infrastructure (Target of the Navbar link) */}
+      {/* Facilities & Infrastructure */}
       <section id="facilities" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 border-l-4 border-cyan-500 pl-3">
           Facilities & Infrastructure
@@ -198,50 +133,14 @@ export default function HomePage() {
               </div>
               <div className="p-4">
                 <h3 className="font-bold text-sm text-white">{item.name}</h3>
-                <span className="text-[11px] text-teal-400 font-semibold mt-1 block">✔ Fully Operational & Verified</span>
+                <span className="text-[11px] text-teal-400 font-semibold mt-1 block">✔ Operational & Verified</span>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* 7. Certifications & Accreditations */}
-      <section className="py-10 sm:py-12 px-4 sm:px-6 max-w-7xl mx-auto w-full text-center">
-        <h2 className="text-lg sm:text-xl font-bold text-white mb-6">Accreditations & Certifications</h2>
-        <div className="flex flex-wrap justify-center gap-3 sm:gap-6">
-          {["NABH Accredited", "NABL Certified Lab", "ISO 9001:2015", "JCI Standards"].map((cert, i) => (
-            <div key={i} className="px-4 py-2.5 sm:px-6 sm:py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-300 font-semibold text-xs sm:text-sm flex items-center">
-              <Award className="w-4 h-4 mr-2 text-cyan-400" />
-              {cert}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 8. Patient Testimonials */}
-      <section className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto w-full">
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 border-l-4 border-cyan-500 pl-3">
-          Patient Testimonials
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-          {[
-            { quote: "The doctors and staff provided exceptional clinical care during my surgery. Seamless coordination and compassionate staff.", name: "Anand Verma" },
-            { quote: "Top-notch emergency care. The triage and admission handled everything quickly without delay.", name: "Priya Sharma" }
-          ].map((t, i) => (
-            <div key={i} className="bg-slate-900 border border-slate-800 rounded-xl p-5 sm:p-6">
-              <div className="flex text-amber-400 mb-2">
-                {[...Array(5)].map((_, index) => (
-                  <Star key={index} className="w-4 h-4 fill-current" />
-                ))}
-              </div>
-              <p className="text-xs sm:text-sm text-slate-300 italic leading-relaxed">&quot;{t.quote}&quot;</p>
-              <p className="text-xs font-bold text-white mt-4">— {t.name}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 9. Footer */}
+      {/* Footer */}
       <footer className="mt-auto bg-slate-900 border-t border-slate-800 text-slate-400 py-10 sm:py-12 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 text-sm">
           <div>
@@ -255,7 +154,6 @@ export default function HomePage() {
             <ul className="space-y-2 text-xs">
               <li><Link href="/about" className="hover:text-cyan-400 transition-colors">About Us</Link></li>
               <li><Link href="/#facilities" className="hover:text-cyan-400 transition-colors">Facilities</Link></li>
-              <li><Link href="/contact" className="hover:text-cyan-400 transition-colors">Contact & Triage</Link></li>
               <li><Link href="/dashboard/patient" className="hover:text-cyan-400 transition-colors">Patient Portal</Link></li>
             </ul>
           </div>
@@ -273,10 +171,17 @@ export default function HomePage() {
             <p className="text-cyan-400 font-bold mt-2 text-base sm:text-lg">Call: +91 0240 2484 888</p>
           </div>
         </div>
-        <div className="text-center text-xs border-t border-slate-800 mt-8 sm:mt-12 pt-6 text-slate-500">
-          Designed & Engineered by Shourya Technologies • Gavane Hospital & Research Centre
-        </div>
       </footer>
+
+      {/* Appointment Booking Pop-up Modal */}
+      <AppointmentBookingModal
+        isOpen={showBookingModal}
+        onClose={() => setShowBookingModal(false)}
+        onSuccess={(msg) => {
+          setFeedback(msg);
+          setTimeout(() => setFeedback(null), 5000);
+        }}
+      />
     </div>
   );
 }
