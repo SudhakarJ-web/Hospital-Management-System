@@ -3,15 +3,28 @@
 import React, { useState, useEffect, useCallback } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar, { SidebarModule } from "@/components/dashboard/DashboardSidebar";
-import MetricsStrip from "@/components/dashboard/MetricsStrip";
-import { getSharedPatients, saveSharedPatient } from "@/lib/sync/patientsSync";
+
+// Import modular tab views
+import MasterOverviewTab from "@/components/dashboard/admin/MasterOverviewTab";
+import DoctorsTab from "@/components/dashboard/admin/DoctorsTab";
+import SupportTab from "@/components/dashboard/admin/SupportTab";
+import MedicalTab from "@/components/dashboard/admin/MedicalTab";
+import RegistrationTab from "@/components/dashboard/admin/RegistrationTab";
+import GenericModuleTab from "@/components/dashboard/admin/GenericModuleTab";
+import StockTab from "@/components/dashboard/admin/StockTab";
+import BillingTab from "@/components/dashboard/admin/BillingTab";
+import AnalysisTab from "@/components/dashboard/admin/AnalysisTab";
+import UtilityTab from "@/components/dashboard/admin/UtilityTab";
+import BackupTab from "@/components/dashboard/admin/BackupTab";
+import CertificatesTab from "@/components/dashboard/admin/CertificatesTab";
+
+import { getSharedPatients, saveSharedPatient, SharedPatient } from "@/lib/sync/patientsSync";
 import {
   getSharedCertificates,
   saveSharedCertificate,
   deleteSharedCertificate,
+  SharedCertificate,
 } from "@/lib/sync/certificatesSync";
-import { SharedPatient } from "@/types/patient";
-import { SharedCertificate } from "@/types/certificate";
 
 const ADMIN_MODULES: SidebarModule[] = [
   { id: "MASTER", label: "MASTER", icon: "🏢", adminBadge: false },
@@ -118,18 +131,6 @@ const INITIAL_DOMAIN_DATA: Record<string, UnifiedRecord[]> = {
       col3: "General Surgery",
       col4: "sudhir@gavanehospital.in (sudhir.gavane)",
       col5: "₹600",
-      status: "Active",
-      created_at: "27/08/2026",
-    },
-    {
-      id: "doc-3",
-      reference_id: "GH-2026-211",
-      category: "Doctors",
-      col1: "Dr. Priya",
-      col2: "MD (Pediatrics)",
-      col3: "Cardiology Dept",
-      col4: "priya@gmail.com (priya)",
-      col5: "₹500",
       status: "Active",
       created_at: "27/08/2026",
     },
@@ -288,7 +289,6 @@ const INITIAL_DOMAIN_DATA: Record<string, UnifiedRecord[]> = {
       created_at: "28/08/2026",
     },
   ],
-  Certificates: [],
   Backup: [
     {
       id: "bk-1",
@@ -306,7 +306,6 @@ const INITIAL_DOMAIN_DATA: Record<string, UnifiedRecord[]> = {
 };
 
 export default function AdminDashboardPage() {
-  // 1. DEFAULT ACTIVE MODULE IS NOW MASTER
   const [activeModule, setActiveModule] = useState<string>("MASTER");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
@@ -315,12 +314,10 @@ export default function AdminDashboardPage() {
   const [sharedCertificates, setSharedCertificates] = useState<SharedCertificate[]>([]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Modal States
+  // Modal State
   const [showModal, setShowModal] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editTargetId, setEditTargetId] = useState<string | null>(null);
-
-  // Form Fields State
   const [formCol1, setFormCol1] = useState("");
   const [formCol2, setFormCol2] = useState("");
   const [formCol3, setFormCol3] = useState("");
@@ -328,7 +325,6 @@ export default function AdminDashboardPage() {
   const [formCol5, setFormCol5] = useState("");
   const [formStatus, setFormStatus] = useState<"Active" | "Pending" | "Completed" | "Suspended">("Active");
 
-  // Load Synchronized Data Store
   const loadAllLedgers = useCallback(async () => {
     const pts = await getSharedPatients();
     setSharedPatients(pts);
@@ -338,15 +334,8 @@ export default function AdminDashboardPage() {
 
     try {
       const cached = localStorage.getItem("gavane_admin_master_store");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        setDataStore(parsed);
-        return;
-      }
-    } catch {
-      // Fallback
-    }
-    setDataStore(INITIAL_DOMAIN_DATA);
+      if (cached) setDataStore(JSON.parse(cached));
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -357,79 +346,23 @@ export default function AdminDashboardPage() {
     setDataStore(updatedStore);
     try {
       localStorage.setItem("gavane_admin_master_store", JSON.stringify(updatedStore));
-    } catch {
-      // Handled
-    }
+    } catch {}
   };
 
-  // Table Headers
-  const getTableHeaders = () => {
-    switch (activeModule) {
-      case "MASTER":
-        return ["Ref ID", "Department / Module", "Clinical Head", "Campus Unit / Location", "Capacity & Scope", "Base Tarif / Key Spec", "Status", "Controls"];
-      case "Doctors":
-        return ["Ref ID", "Doctor Name & Title", "Degree / Qualification", "Specialty Department", "Email / Username", "Fee", "Status", "Controls"];
-      case "Support":
-        return ["Ref ID", "Staff Name", "Designation / Role", "Assigned Unit / Triage", "Contact Phone", "Shift Schedule", "Status", "Controls"];
-      case "Medical":
-        return ["Ref ID", "Officer / Pharmacist", "Role / Qualification", "Depot Unit", "License / Batch", "Official Email", "Status", "Controls"];
-      case "Registration":
-        return ["Ref ID", "Patient Legal Name", "Phone Number", "Department", "Assigned Doctor", "Particulars / Notes", "Status", "Controls"];
-      case "Certificates":
-        return ["Cert ID", "Certificate Title", "Citizen Beneficiary", "Purpose", "Issued Timestamp", "Authorizing Officer", "Status", "Controls"];
+  const getGenericHeaders = (mod: string) => {
+    switch (mod) {
+      case "OPD":
+        return ["Token / ID", "Patient Legal Name", "Token Number", "Consultation Specialty", "Observed Vitals", "Assigned Doctor", "Status", "Controls"];
+      case "IPD":
+        return ["Admission ID", "Patient Legal Name", "Bed & Ward Assignment", "Department Ward", "Admission Date", "Attending Consultant", "Status", "Controls"];
+      case "OT":
+        return ["Surgery ID", "Surgical Procedure", "Patient Name", "OT Theater Complex", "Scheduled Slot", "Chief Surgeon", "Status", "Controls"];
+      case "Radiology":
+        return ["Scan ID", "Imaging Investigation", "Patient Name", "Radiology Suite", "Request Timestamp", "Technician / Radiologist", "Status", "Controls"];
+      case "Pathology":
+        return ["Sample ID", "Diagnostic Panel", "Sample Identifier", "Lab Section", "Patient Name", "Technician / Notes", "Status", "Controls"];
       default:
-        return ["Ref ID", "Primary Subject", "Classification", "Department", "Metadata Details", "Assigned Owner", "Status", "Controls"];
-    }
-  };
-
-  // Modal Configuration
-  const getModalConfig = () => {
-    switch (activeModule) {
-      case "MASTER":
-        return {
-          title: isEditing ? "Edit Master Department Entry" : "Create Master Institutional Unit",
-          l1: "Department / Module Name", p1: "e.g. Neurology & Stroke Unit",
-          l2: "Clinical Head / In-Charge", p2: "e.g. Dr. Elena Rostova",
-          l3: "Campus Location / Building", p3: "e.g. Building B, Floor 4",
-          l4: "Capacity & Operational Details", p4: "e.g. 16 Beds, 2 Trauma Bays",
-          l5: "Base Tarif / Standard Spec", p5: "e.g. ₹600 Base OPD",
-        };
-      case "Certificates":
-        return {
-          title: isEditing ? "Edit Certificate" : "Issue / Record Medical Certificate",
-          l1: "Certificate Title", p1: "e.g. Medical Fitness Certificate",
-          l2: "Citizen Beneficiary", p2: "e.g. Mayur Jadhav",
-          l3: "Clinical Purpose", p3: "e.g. ENT Clearance / Sick Leave",
-          l4: "Issued Timestamp", p4: "28/08/2026",
-          l5: "Authorizing Officer / Doctor", p5: "Dr. Sudhir Gavane",
-        };
-      case "Doctors":
-        return {
-          title: isEditing ? "Edit Doctor Profile" : "Register Consultant / Doctor",
-          l1: "Doctor Full Name", p1: "e.g. Dr. Priya",
-          l2: "Degree / Qualification", p2: "e.g. MBBS, MD",
-          l3: "Specialty Department", p3: "e.g. Cardiology Dept",
-          l4: "Official Email Address", p4: "doctor@gavanehospital.in",
-          l5: "Consultation Fee (₹ INR)", p5: "500",
-        };
-      case "Registration":
-        return {
-          title: "Register New Patient Record",
-          l1: "Patient Legal Name", p1: "e.g. Ramesh Jadhav",
-          l2: "Contact Phone Number", p2: "9876543210",
-          l3: "Clinical Department", p3: "Cardiology Dept",
-          l4: "Assigned Doctor", p4: "Dr. Priya",
-          l5: "Registration Notes", p5: "Consultation booked",
-        };
-      default:
-        return {
-          title: `Create ${activeModule} Entry`,
-          l1: "Primary Title / Name", p1: "Enter primary name...",
-          l2: "Specification / Detail", p2: "Enter details...",
-          l3: "Department / Section", p3: "Enter department...",
-          l4: "Contact / Value / Timestamp", p4: "Enter value...",
-          l5: "Operator / Authorized Person", p5: "Enter operator name...",
-        };
+        return ["Ref ID", "Primary Subject", "Detail", "Department", "Metadata", "Owner / Notes", "Status", "Controls"];
     }
   };
 
@@ -438,32 +371,22 @@ export default function AdminDashboardPage() {
     setEditTargetId(null);
     setFormCol1("");
     setFormCol2("");
-    setFormCol3(activeModule === "Certificates" ? "ENT Clearance" : "");
-    setFormCol4(activeModule === "Certificates" ? "28/08/2026" : "");
-    setFormCol5(activeModule === "Certificates" ? "Dr. Sudhir Gavane" : "");
+    setFormCol3("");
+    setFormCol4("");
+    setFormCol5("");
     setFormStatus("Active");
     setShowModal(true);
   };
 
-  const handleOpenEditModal = (item: UnifiedRecord | SharedCertificate) => {
+  const handleOpenEditModal = (item: UnifiedRecord) => {
     setIsEditing(true);
     setEditTargetId(item.id);
-
-    if ("certificate_title" in item) {
-      setFormCol1(item.certificate_title);
-      setFormCol2(item.patient_name);
-      setFormCol3(item.purpose);
-      setFormCol4(item.issued_date);
-      setFormCol5(item.authorizing_doctor);
-      setFormStatus(item.status);
-    } else {
-      setFormCol1(item.col1);
-      setFormCol2(item.col2);
-      setFormCol3(item.col3);
-      setFormCol4(item.col4);
-      setFormCol5(item.col5);
-      setFormStatus(item.status);
-    }
+    setFormCol1(item.col1);
+    setFormCol2(item.col2);
+    setFormCol3(item.col3);
+    setFormCol4(item.col4);
+    setFormCol5(item.col5);
+    setFormStatus(item.status);
     setShowModal(true);
   };
 
@@ -483,10 +406,9 @@ export default function AdminDashboardPage() {
         status: formStatus === "Pending" ? "Pending" : "Active",
         created_at: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
       };
-
       const updated = await saveSharedPatient(newPt);
       setSharedPatients(updated);
-      setFeedback({ type: "success", text: `Patient ${formCol1} registered. Synced universally.` });
+      setFeedback({ type: "success", text: `Patient ${formCol1} registered.` });
       setShowModal(false);
       return;
     }
@@ -495,7 +417,7 @@ export default function AdminDashboardPage() {
       const randomSuffix = Math.floor(100 + Math.random() * 900);
       const certObj: SharedCertificate = {
         id: editTargetId || `cert-${Date.now()}`,
-        reference_id: isEditing && editTargetId ? (sharedCertificates.find((c) => c.id === editTargetId)?.reference_id || `GH-2026-${randomSuffix}`) : `GH-2026-${randomSuffix}`,
+        reference_id: `GH-2026-${randomSuffix}`,
         certificate_title: formCol1,
         patient_name: formCol2,
         purpose: formCol3,
@@ -504,10 +426,9 @@ export default function AdminDashboardPage() {
         status: formStatus,
         created_at: new Date().toLocaleDateString("en-IN"),
       };
-
       const updatedCerts = await saveSharedCertificate(certObj);
       setSharedCertificates(updatedCerts);
-      setFeedback({ type: "success", text: `Certificate for ${formCol2} saved. Synced to Doctor & Support portals.` });
+      setFeedback({ type: "success", text: `Certificate for ${formCol2} saved.` });
       setShowModal(false);
       return;
     }
@@ -519,15 +440,7 @@ export default function AdminDashboardPage() {
     if (isEditing && editTargetId) {
       updatedList = currentTabRecords.map((r) =>
         r.id === editTargetId
-          ? {
-              ...r,
-              col1: formCol1,
-              col2: formCol2,
-              col3: formCol3,
-              col4: formCol4,
-              col5: formCol5,
-              status: formStatus,
-            }
+          ? { ...r, col1: formCol1, col2: formCol2, col3: formCol3, col4: formCol4, col5: formCol5, status: formStatus }
           : r
       );
       setFeedback({ type: "success", text: `Updated record for ${formCol1}.` });
@@ -545,7 +458,7 @@ export default function AdminDashboardPage() {
         created_at: new Date().toLocaleDateString("en-IN"),
       };
       updatedList = [newRecord, ...currentTabRecords];
-      setFeedback({ type: "success", text: `Added new entry into ${activeModule} control ledger.` });
+      setFeedback({ type: "success", text: `Added new entry into ${activeModule} ledger.` });
     }
 
     const updatedStore = { ...dataStore, [activeModule]: updatedList };
@@ -554,7 +467,7 @@ export default function AdminDashboardPage() {
   };
 
   const handleDeleteEntry = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to remove record for ${name}?`)) return;
+    if (!confirm(`Are you sure you want to delete ${name}?`)) return;
 
     if (activeModule === "Registration") {
       const updatedPts = sharedPatients.filter((p) => p.id !== id);
@@ -574,61 +487,12 @@ export default function AdminDashboardPage() {
     const currentTabRecords = dataStore[activeModule] || [];
     const updatedList = currentTabRecords.filter((r) => r.id !== id);
     const updatedStore = { ...dataStore, [activeModule]: updatedList };
-
     persistData(updatedStore);
-    setFeedback({ type: "success", text: `Removed record for ${name}.` });
+    setFeedback({ type: "success", text: `Removed ${name}.` });
   };
-
-  // Resolve Records for Active Tab
-  let currentRecords: (UnifiedRecord | { id: string; reference_id: string; col1: string; col2: string; col3: string; col4: string; col5: string; status: "Active" | "Pending" | "Completed" | "Suspended"; created_at?: string })[] = [];
-
-  if (activeModule === "Registration") {
-    currentRecords = sharedPatients.map((p) => ({
-      id: p.id,
-      reference_id: p.reference_id,
-      category: "Registration",
-      col1: p.full_name,
-      col2: p.phone,
-      col3: p.department,
-      col4: p.assigned_doctor,
-      col5: p.notes || "Standard Triage",
-      status: p.status,
-      created_at: p.created_at,
-    }));
-  } else if (activeModule === "Certificates") {
-    currentRecords = sharedCertificates.map((c) => ({
-      id: c.id,
-      reference_id: c.reference_id,
-      category: "Certificates",
-      col1: c.certificate_title,
-      col2: c.patient_name,
-      col3: c.purpose,
-      col4: c.issued_date,
-      col5: c.authorizing_doctor,
-      status: c.status,
-      created_at: c.created_at,
-    }));
-  } else {
-    currentRecords = dataStore[activeModule] || [];
-  }
-
-  const filteredRecords = currentRecords.filter(
-    (r) =>
-      r.col1.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.col2.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.col3.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.reference_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.col4.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const totalCount = filteredRecords.length;
-  const activeCount = filteredRecords.filter((r) => r.status === "Active" || r.status === "Completed").length;
-  const pendingCount = filteredRecords.filter((r) => r.status === "Pending" || r.status === "Suspended").length;
-  const modalConfig = getModalConfig();
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col font-sans text-slate-800">
-      {/* Header */}
       <DashboardHeader
         roleIcon="✓"
         loggedAsText="Admin (admin@gavanehospital.in)"
@@ -636,7 +500,7 @@ export default function AdminDashboardPage() {
         bannerText="Welcome to Gavane Hospital Management System"
       />
 
-      {/* Mobile Sidebar Trigger Bar */}
+      {/* Mobile Switch Bar */}
       <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-2 text-xs font-bold text-white truncate">
           <span className="text-teal-400">🏢 Module:</span>
@@ -651,7 +515,6 @@ export default function AdminDashboardPage() {
       </div>
 
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <DashboardSidebar
             modules={ADMIN_MODULES}
@@ -664,7 +527,7 @@ export default function AdminDashboardPage() {
           />
         </div>
 
-        {/* Mobile Collapsible Sidebar Drawer */}
+        {/* Mobile Sidebar Drawer */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 z-50 lg:hidden flex flex-col bg-slate-950/80 backdrop-blur-sm">
             <div className="w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-left duration-200">
@@ -687,20 +550,13 @@ export default function AdminDashboardPage() {
                       setMobileMenuOpen(false);
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                      activeModule === m.id
-                        ? "bg-teal-600 text-white shadow-sm"
-                        : "text-slate-700 hover:bg-slate-100"
+                      activeModule === m.id ? "bg-teal-600 text-white shadow-sm" : "text-slate-700 hover:bg-slate-100"
                     }`}
                   >
                     <div className="flex items-center space-x-2 truncate">
                       <span>{m.icon}</span>
                       <span className="truncate">{m.label}</span>
                     </div>
-                    {m.adminBadge && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-extrabold">
-                        ADMIN
-                      </span>
-                    )}
                   </button>
                 ))}
               </div>
@@ -709,10 +565,8 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* Main Workspace Area */}
+        {/* Main Orchestrator Workspace */}
         <main className="flex-1 p-3 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 min-w-0">
-          
-          {/* Top Control Toolbar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-xs">
             <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 px-1 py-0.5 min-w-0">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0"></span>
@@ -733,12 +587,11 @@ export default function AdminDashboardPage() {
                 className="flex-1 sm:flex-none px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <span>+</span>
-                <span>Add {activeModule === "Registration" ? "Patient" : activeModule === "Certificates" ? "Certificate" : `${activeModule} Entry`}</span>
+                <span>Add {activeModule} Entry</span>
               </button>
             </div>
           </div>
 
-          {/* Feedback Banner */}
           {feedback && (
             <div className="p-3 rounded-xl border text-xs font-bold bg-emerald-50 border-emerald-300 text-emerald-900 flex justify-between items-center">
               <span>{feedback.text}</span>
@@ -746,159 +599,155 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* MASTER Overview Cards when activeModule === 'MASTER' */}
+          {/* Conditional Modular Tab Renderers */}
           {activeModule === "MASTER" && (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              {[
-                { title: "Consultant Staff", count: `${dataStore.Doctors?.length || 3} Active`, desc: "3 Specialty Depts", icon: "🩺" },
-                { title: "IPD Capacity", count: "186 / 200", desc: "93% Hospital Occupancy", icon: "🛏️" },
-                { title: "Active Triage", count: `${sharedPatients.length} Registered`, desc: "Real-Time OPD Feed", icon: "🏥" },
-                { title: "OT Schedule", count: `${dataStore.OT?.length || 1} Booked`, desc: "General & Laparoscopy", icon: "✂️" },
-              ].map((card, i) => (
-                <div key={i} className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 shadow-xs">
-                  <div className="flex items-center justify-between text-slate-400 mb-1">
-                    <span className="text-[11px] font-bold uppercase">{card.title}</span>
-                    <span className="text-lg">{card.icon}</span>
-                  </div>
-                  <div className="text-lg sm:text-xl font-black text-slate-900">{card.count}</div>
-                  <div className="text-[10px] text-teal-600 font-semibold mt-0.5">{card.desc}</div>
-                </div>
-              ))}
-            </div>
+            <MasterOverviewTab
+              records={dataStore.MASTER || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenAddModal={handleOpenAddModal}
+              onOpenEditModal={handleOpenEditModal}
+              onDeleteRecord={handleDeleteEntry}
+              activeDoctorsCount={dataStore.Doctors?.length || 2}
+              totalRegisteredPatients={sharedPatients.length}
+              activeOtCount={dataStore.OT?.length || 1}
+            />
           )}
 
-          {/* Dynamic Master Table Container */}
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 space-y-4 sm:space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-slate-100 pb-4">
-              <div>
-                <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase">
-                  {activeModule} Control Ledger
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                  Module Scope: <strong className="text-teal-700 font-bold">{activeModule}</strong> • Showing {filteredRecords.length} Monitored Record(s)
-                </p>
-              </div>
-
-              <div className="relative w-full md:w-72">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-xs">🔍</span>
-                <input
-                  type="text"
-                  placeholder={`Search ${activeModule}...`}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <MetricsStrip
-              totalCount={totalCount}
-              activeCount={activeCount}
-              pendingCount={pendingCount}
-              totalLabel={`Total ${activeModule} Entries`}
-              activeLabel="Operational / Active"
-              pendingLabel="Pending Review"
+          {activeModule === "Doctors" && (
+            <DoctorsTab
+              records={dataStore.Doctors || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEditModal={handleOpenEditModal}
+              onDeleteRecord={handleDeleteEntry}
             />
+          )}
 
-            {/* Horizontally Scrollable Table on Mobile */}
-            <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-xs">
-              <table className="w-full text-left text-xs text-slate-700 min-w-[750px]">
-                <thead className="bg-[#f8fafc] text-[10px] font-black uppercase text-slate-600 border-b border-slate-200 tracking-wider">
-                  <tr>
-                    {getTableHeaders().map((h, idx) => (
-                      <th
-                        key={idx}
-                        className={`px-4 py-3.5 ${idx === getTableHeaders().length - 1 ? "text-right" : ""}`}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredRecords.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-5 py-10 text-center text-slate-400 font-medium">
-                        No {activeModule} records currently found. Click &quot;+ Add Entry&quot; above to log an entry.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredRecords.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-4 py-3.5 font-bold text-teal-700 whitespace-nowrap">{item.reference_id}</td>
-                        <td className="px-4 py-3.5 font-extrabold text-slate-900">{item.col1}</td>
-                        <td className="px-4 py-3.5 font-medium text-slate-600">{item.col2}</td>
-                        <td className="px-4 py-3.5 font-medium text-slate-700">{item.col3}</td>
-                        <td className="px-4 py-3.5 font-medium text-slate-600">{item.col4}</td>
-                        <td className="px-4 py-3.5 font-bold text-slate-800">{item.col5}</td>
-                        <td className="px-4 py-3.5 whitespace-nowrap">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                              item.status === "Active" || item.status === "Completed"
-                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                                : item.status === "Pending"
-                                ? "bg-amber-100 text-amber-800 border border-amber-200"
-                                : "bg-rose-100 text-rose-800 border border-rose-200"
-                            }`}
-                          >
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
-                          <button
-                            onClick={() => handleOpenEditModal(item as UnifiedRecord)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
-                            title="Edit Record"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={() => handleDeleteEntry(item.id, item.col1)}
-                            className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                            title="Delete Record"
-                          >
-                            🗑️
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {activeModule === "Support" && (
+            <SupportTab
+              records={dataStore.Support || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEditModal={handleOpenEditModal}
+              onDeleteRecord={handleDeleteEntry}
+            />
+          )}
+
+          {activeModule === "Medical" && (
+            <MedicalTab
+              records={dataStore.Medical || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEditModal={handleOpenEditModal}
+              onDeleteRecord={handleDeleteEntry}
+            />
+          )}
+
+          {activeModule === "Registration" && (
+            <RegistrationTab
+              patients={sharedPatients}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onDeletePatient={handleDeleteEntry}
+            />
+          )}
+
+          {activeModule === "Stock" && (
+            <StockTab
+              records={dataStore.Stock || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEditModal={handleOpenEditModal}
+              onDeleteRecord={handleDeleteEntry}
+            />
+          )}
+
+          {activeModule === "Billing" && (
+            <BillingTab
+              records={dataStore.Billing || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEditModal={handleOpenEditModal}
+              onDeleteRecord={handleDeleteEntry}
+            />
+          )}
+
+          {activeModule === "Analysis" && (
+            <AnalysisTab
+              records={dataStore.Analysis || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEditModal={handleOpenEditModal}
+              onDeleteRecord={handleDeleteEntry}
+            />
+          )}
+
+          {activeModule === "Utility" && (
+            <UtilityTab
+              records={dataStore.Utility || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEditModal={handleOpenEditModal}
+              onDeleteRecord={handleDeleteEntry}
+            />
+          )}
+
+          {activeModule === "Backup" && (
+            <BackupTab
+              records={dataStore.Backup || []}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEditModal={handleOpenEditModal}
+              onDeleteRecord={handleDeleteEntry}
+            />
+          )}
+
+          {activeModule === "Certificates" && (
+            <CertificatesTab
+              certificates={sharedCertificates}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onDeleteCertificate={handleDeleteEntry}
+            />
+          )}
+
+          {["OPD", "IPD", "OT", "Radiology", "Pathology"].includes(activeModule) && (
+            <GenericModuleTab
+              moduleName={activeModule}
+              records={dataStore[activeModule] || []}
+              headers={getGenericHeaders(activeModule)}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onOpenEditModal={handleOpenEditModal}
+              onDeleteRecord={handleDeleteEntry}
+            />
+          )}
         </main>
       </div>
 
-      {/* Sticky Bottom Status Footer */}
       <footer className="bg-[#0b1b2b] text-slate-400 px-4 py-2 text-[10px] flex flex-col sm:flex-row items-center justify-between border-t border-slate-800 gap-1 text-center sm:text-left">
         <div>Current User :- <strong className="text-teal-400">Admin Console • Pune Central Node</strong></div>
         <div>Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span></div>
       </footer>
 
-      {/* Dynamic Modal */}
+      {/* Dynamic Creation / Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 sm:p-6 space-y-4 my-auto max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                  Target: {activeModule} Module
-                </span>
-                <h3 className="text-base font-extrabold text-slate-900 mt-1">
-                  {modalConfig.title}
-                </h3>
-              </div>
+              <h3 className="text-base font-extrabold text-slate-900">
+                {isEditing ? `Edit ${activeModule} Entry` : `New ${activeModule} Entry`}
+              </h3>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
             </div>
 
             <form onSubmit={handleSaveModalEntry} className="space-y-3.5">
               <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">{modalConfig.l1} *</label>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Primary Title / Name *</label>
                 <input
                   type="text"
                   required
-                  placeholder={modalConfig.p1}
                   value={formCol1}
                   onChange={(e) => setFormCol1(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -907,22 +756,20 @@ export default function AdminDashboardPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">{modalConfig.l2} *</label>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Specification / Role *</label>
                   <input
                     type="text"
                     required
-                    placeholder={modalConfig.p2}
                     value={formCol2}
                     onChange={(e) => setFormCol2(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">{modalConfig.l3} *</label>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Department / Location *</label>
                   <input
                     type="text"
                     required
-                    placeholder={modalConfig.p3}
                     value={formCol3}
                     onChange={(e) => setFormCol3(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -932,22 +779,20 @@ export default function AdminDashboardPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">{modalConfig.l4} *</label>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Contact / Units / Time *</label>
                   <input
                     type="text"
                     required
-                    placeholder={modalConfig.p4}
                     value={formCol4}
                     onChange={(e) => setFormCol4(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">{modalConfig.l5} *</label>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Fee / Expiry / Notes *</label>
                   <input
                     type="text"
                     required
-                    placeholder={modalConfig.p5}
                     value={formCol5}
                     onChange={(e) => setFormCol5(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -964,7 +809,7 @@ export default function AdminDashboardPage() {
                 >
                   <option value="Active">Active / Cleared</option>
                   <option value="Pending">Pending Review / Triage</option>
-                  <option value="Completed">Completed / Archived</option>
+                  <option value="Completed">Completed / Cleared</option>
                   <option value="Suspended">Suspended / Inactive</option>
                 </select>
               </div>
