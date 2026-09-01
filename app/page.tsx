@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
-  ChevronRight, Award, ShieldCheck, HeartPulse, Stethoscope, 
-  Phone, Mail, MapPin, Star
+  Award, ShieldCheck, HeartPulse, Stethoscope, 
+  Phone, Mail, MapPin, Star, Calendar, Clock, ArrowRight,
+  Activity, CheckCircle2, UserCheck, Sparkles, Building2
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import AppointmentBookingModal from "@/components/AppointmentBookingModal";
@@ -21,165 +22,407 @@ export default function HomePage() {
   if (!isMounted) return null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col selection:bg-teal-500 selection:text-white">
-      {/* Responsive Navbar */}
+    <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col selection:bg-teal-500 selection:text-white">
+      {/* Top Navbar */}
       <Navbar />
 
-      {/* Feedback Toast */}
+      {/* Floating Feedback Notification */}
       {feedback && (
-        <div className="fixed top-16 right-4 z-50 p-3.5 bg-emerald-600 text-white rounded-xl shadow-xl text-xs font-bold flex items-center space-x-2 animate-in slide-in-from-top duration-200">
-          <span>✓ {feedback}</span>
-          <button onClick={() => setFeedback(null)} className="ml-2 font-bold hover:text-slate-200">✕</button>
+        <div className="fixed top-20 right-4 z-50 p-4 bg-emerald-600 text-white rounded-2xl shadow-2xl text-xs font-bold flex items-center space-x-2 animate-in slide-in-from-top duration-300">
+          <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+          <span>{feedback}</span>
+          <button onClick={() => setFeedback(null)} className="ml-3 text-white/80 hover:text-white font-bold">✕</button>
         </div>
       )}
 
-      {/* Hero Section */}
-      <section className="relative py-14 sm:py-20 text-center px-4 sm:px-6 bg-gradient-to-b from-slate-900 to-slate-950">
-        <span className="text-[10px] sm:text-xs uppercase tracking-widest text-cyan-400 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/20 font-bold">
-          YOUR HEALTH IS OUR PRIORITY
-        </span>
-        <h1 className="text-3xl sm:text-4xl md:text-6xl font-extrabold text-white mt-4 max-w-4xl mx-auto leading-tight tracking-tight">
-          Your Most Trusted Healthcare Partner
-        </h1>
-        <p className="text-slate-400 max-w-2xl mx-auto mt-4 text-xs sm:text-sm md:text-base leading-relaxed">
-          Providing end-to-end hospital administration, clinical management, real-time doctor portals, patient OPD/IPD tracking, and automated billing workflows.
-        </p>
-        <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 max-w-md mx-auto sm:max-w-none">
-          <button
-            type="button"
-            onClick={() => setShowBookingModal(true)}
-            className="px-6 py-3 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-teal-500/20 transition-all active:scale-95 text-center text-sm cursor-pointer"
-          >
-            Book Appointment
-          </button>
-          <Link
-            href="/dashboard/doctor"
-            className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 font-bold rounded-xl transition-all active:scale-95 text-center text-sm"
-          >
-            Staff Portal Sign In
-          </Link>
+      {/* Hero Section with Fresh Cool Gradient */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-[#e6f4f7] via-[#f0f9fa] to-[#f8fafc] py-16 sm:py-24 px-4 sm:px-6 border-b border-teal-100/60">
+        {/* Subtle background decorative shapes */}
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-teal-200/40 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 -left-24 w-80 h-80 bg-cyan-200/30 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="max-w-5xl mx-auto text-center relative z-10 space-y-5">
+          <div className="inline-flex items-center space-x-2 bg-white/80 backdrop-blur-md border border-teal-300/60 px-4 py-1.5 rounded-full shadow-xs">
+            <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+            <span className="text-[11px] sm:text-xs font-extrabold uppercase tracking-widest text-teal-800">
+              NABH ACCREDITED • YOUR HEALTH IS OUR HIGHEST PRIORITY
+            </span>
+          </div>
+
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-slate-900 tracking-tight leading-[1.15]">
+            Compassionate Care Driven by <br className="hidden sm:inline" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 via-cyan-600 to-teal-800">
+              Advanced Clinical Excellence
+            </span>
+          </h1>
+
+          <p className="text-slate-600 max-w-2xl mx-auto text-xs sm:text-base leading-relaxed font-normal">
+            Gavane Hospital & Research Centre provides round-the-clock emergency care, multi-specialty surgical suites, digital EHR consultations, and certified diagnostic laboratories.
+          </p>
+
+          <div className="pt-4 flex flex-col sm:flex-row justify-center items-center gap-3.5 max-w-sm sm:max-w-none mx-auto">
+            <button
+              type="button"
+              onClick={() => setShowBookingModal(true)}
+              className="w-full sm:w-auto px-8 py-4 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-sm uppercase tracking-wider rounded-2xl shadow-lg shadow-teal-600/25 transition-all active:scale-95 flex items-center justify-center space-x-2 cursor-pointer"
+            >
+              <Calendar className="w-4 h-4" />
+              <span>Book Appointment</span>
+            </button>
+            <a
+              href="tel:+9102402484888"
+              className="w-full sm:w-auto px-6 py-4 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-sm rounded-2xl shadow-xs transition-all flex items-center justify-center space-x-2"
+            >
+              <Phone className="w-4 h-4 text-teal-600" />
+              <span>Emergency 24/7 Hotline</span>
+            </a>
+          </div>
+
+          {/* Trust Highlights */}
+          <div className="pt-8 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-4xl mx-auto text-left">
+            {[
+              { label: "24/7 Trauma Triage", sub: "Level-1 Rapid Response" },
+              { label: "50+ Specialist Doctors", sub: "Multi-Disciplinary Board" },
+              { label: "NABL & NABH Certified", sub: "National Quality Standard" },
+              { label: "DPDP Encrypted EHR", sub: "100% Patient Privacy" },
+            ].map((stat, i) => (
+              <div key={i} className="bg-white/80 backdrop-blur-xs border border-slate-200/80 p-3 rounded-xl">
+                <div className="text-xs font-black text-slate-900">{stat.label}</div>
+                <div className="text-[10px] text-teal-700 font-semibold mt-0.5">{stat.sub}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Core Services */}
-      <section id="services" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto w-full">
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 border-l-4 border-cyan-500 pl-3">
-          Our Core Services
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {[
-            { title: "24/7 Emergency Care", desc: "Rapid trauma triage, intensive resuscitation units, and dedicated round-the-clock emergency surgeons." },
-            { title: "Advanced Surgery", desc: "Minimally invasive laparoscopic, robotic, and precision orthopedic surgical interventions." },
-            { title: "Comprehensive Diagnostics", desc: "High-throughput NABL-certified pathology and 3 Tesla digital MRI & CT imaging." },
-            { title: "Outpatient Clinics", desc: "Multi-specialty consultations with computerized prescriptions and digital EHR synchronization." },
-          ].map((service, idx) => (
-            <div
-              key={idx}
-              className="p-5 sm:p-6 bg-slate-900 border border-slate-800 rounded-xl hover:border-cyan-500/50 transition-all group"
+      {/* 1. Our Core Services (Reference Style Cards) */}
+      <section id="services" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
+        <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
+          <span className="text-xs font-extrabold uppercase tracking-widest text-teal-600">CLINICAL SOLUTIONS</span>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Our Core Services</h2>
+          <p className="text-xs sm:text-sm text-slate-500">Comprehensive round-the-clock medical capabilities for patients and families.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Service Card 1: Diagnostics */}
+          <div className="bg-white rounded-3xl p-7 border border-slate-200 shadow-md shadow-slate-200/50 hover:shadow-xl hover:border-teal-400/60 transition-all group flex flex-col justify-between">
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-600 mb-6 group-hover:scale-110 transition-transform">
+                <Stethoscope className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 mb-4">Diagnostics</h3>
+              <ul className="space-y-2.5 text-xs font-semibold text-slate-600">
+                <li className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500" />
+                  <span>Lab Tests & High-Throughput Pathology</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500" />
+                  <span>3 Tesla MRI & Digital Radiology</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-teal-600" />
+                  <span>Color Doppler & 4D Ultrasonography</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-teal-600" />
+                  <span>Cardiac Holter & 12-Lead ECG</span>
+                </li>
+              </ul>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowBookingModal(true)}
+              className="mt-6 inline-flex items-center text-xs font-bold text-teal-700 hover:text-teal-900 cursor-pointer"
             >
-              <Stethoscope className="text-cyan-400 w-8 h-8 mb-4 group-hover:scale-110 transition-transform" />
-              <h3 className="font-bold text-base sm:text-lg text-white">{service.title}</h3>
-              <p className="text-xs text-slate-400 mt-2 leading-relaxed">{service.desc}</p>
+              Book Diagnostic Scan <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </button>
+          </div>
+
+          {/* Service Card 2: 24-Hour Services */}
+          <div className="bg-white rounded-3xl p-7 border border-slate-200 shadow-md shadow-slate-200/50 hover:shadow-xl hover:border-teal-400/60 transition-all group flex flex-col justify-between">
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-cyan-50 border border-cyan-200 flex items-center justify-center text-cyan-600 mb-6 group-hover:scale-110 transition-transform">
+                <Clock className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 mb-4">24-Hour Services</h3>
+              <div className="grid grid-cols-2 gap-2.5 text-xs font-semibold text-slate-600">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  <span>Pharmacy</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  <span>Emergency Room</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  <span>Emergency Surgery</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  <span>Specialist OPD</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-teal-600 shrink-0" />
+                  <span>Lab Tests</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-teal-600 shrink-0" />
+                  <span>Radiology</span>
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowBookingModal(true)}
+              className="mt-6 inline-flex items-center text-xs font-bold text-teal-700 hover:text-teal-900 cursor-pointer"
+            >
+              Consult On-Duty Doctor <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </button>
+          </div>
+
+          {/* Service Card 3: Emergency Care */}
+          <div className="bg-white rounded-3xl p-7 border border-slate-200 shadow-md shadow-slate-200/50 hover:shadow-xl hover:border-teal-400/60 transition-all group flex flex-col justify-between">
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 mb-6 group-hover:scale-110 transition-transform">
+                <HeartPulse className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 mb-4">Emergency Care</h3>
+              <div className="grid grid-cols-2 gap-2.5 text-xs font-semibold text-slate-600">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  <span>Intensive CCU / ICU</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  <span>GPS Ambulance</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  <span>Trauma Surgery</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  <span>Stat Lab Tests</span>
+                </div>
+              </div>
+            </div>
+            <a
+              href="tel:+9102402484888"
+              className="mt-6 inline-flex items-center text-xs font-bold text-rose-600 hover:text-rose-800"
+            >
+              Call Trauma Center <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* 2. Our Medical Facilities (Reference Style Photos) */}
+      <section id="facilities" className="py-16 sm:py-20 px-4 sm:px-6 bg-[#f1f7f9] border-y border-slate-200/80">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-teal-700">MODERN CAMPUS</span>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Our Medical Facilities</h2>
+            <p className="text-xs sm:text-sm text-slate-500">Engineered with advanced medical infrastructure and patient recovery suites.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              {
+                title: "Outpatient Services",
+                desc: "Convenient, walk-in healthcare for specialist consultations, checkups, and diagnostic triage.",
+                img: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
+              },
+              {
+                title: "Inpatient Rooms",
+                desc: "Comfortable, sanitized private & semi-private rooms equipped for extended clinical recovery.",
+                img: "https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=600&q=80",
+              },
+              {
+                title: "Emergency Services",
+                desc: "Immediate trauma assistance available round-the-clock with ventilator resuscitation units.",
+                img: "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=600&q=80",
+              },
+              {
+                title: "Diagnostics & Imaging",
+                desc: "Cutting-edge 3T MRI, automated biochemistry, and expert radiological reporting.",
+                img: "https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=600&q=80",
+              },
+            ].map((fac, idx) => (
+              <div key={idx} className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col">
+                <div className="h-44 overflow-hidden relative">
+                  <img src={fac.img} alt={fac.title} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                </div>
+                <div className="p-5 flex-1 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-bold text-base text-slate-900">{fac.title}</h3>
+                    <p className="text-xs text-slate-500 mt-2 leading-relaxed">{fac.desc}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 3. Specialist Doctors List */}
+      <section id="doctors" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
+        <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
+          <span className="text-xs font-extrabold uppercase tracking-widest text-teal-600">MEDICAL BOARD</span>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Our Specialist Doctors</h2>
+          <p className="text-xs sm:text-sm text-slate-500">Board-certified clinicians offering multidisciplinary consultation and surgery.</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[
+            {
+              name: "Dr. Ananya Rao",
+              degree: "MBBS, MD (Cardiology), FACC",
+              dept: "Cardiology & Cardiac Sciences",
+              role: "Senior Consultant Cardiologist",
+              image: "https://images.unsplash.com/photo-1594824813629-9e8c45f448ea?auto=format&fit=crop&w=600&q=80",
+            },
+            {
+              name: "Dr. Sudhir Gavane",
+              degree: "MS (General & Laparoscopic Surgery), M.Ch",
+              dept: "General Surgery & Trauma",
+              role: "Chief Surgical Specialist",
+              image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=600&q=80",
+            },
+            {
+              name: "Dr. Priya",
+              degree: "MD (Internal Medicine & Pediatrics)",
+              dept: "General Medicine & Pediatrics",
+              role: "Consultant Physician",
+              image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80",
+            },
+          ].map((doc, idx) => (
+            <div key={idx} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm hover:shadow-lg hover:border-teal-400 transition-all text-center">
+              <div className="w-24 h-24 rounded-full mx-auto mb-4 overflow-hidden border-3 border-teal-500 shadow-md">
+                <img src={doc.image} alt={doc.name} className="w-full h-full object-cover" />
+              </div>
+              <h3 className="font-extrabold text-slate-900 text-lg">{doc.name}</h3>
+              <p className="text-xs text-teal-700 font-bold mt-0.5">{doc.degree}</p>
+              <div className="mt-3 inline-block px-3 py-1 bg-teal-50 text-teal-800 text-[11px] font-extrabold rounded-full border border-teal-200">
+                {doc.dept}
+              </div>
+              <p className="text-xs text-slate-500 mt-2">{doc.role}</p>
+
+              <button
+                type="button"
+                onClick={() => setShowBookingModal(true)}
+                className="mt-5 w-full py-2 bg-slate-900 hover:bg-teal-600 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Book with {doc.name.split(" ")[1] || "Doctor"}
+              </button>
             </div>
           ))}
         </div>
       </section>
 
-      {/* About Us Preview */}
-      <section className="py-12 sm:py-16 px-4 sm:px-6 bg-slate-900/50 border-y border-slate-800">
-        <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-white border-l-4 border-cyan-500 pl-3 mb-4">
-              About Gavane Hospital
-            </h2>
-            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-              Gavane Hospital & Research Centre is dedicated to delivering exemplary patient care through clinical innovation, advanced medical technology, and compassionate healthcare solutions.
-            </p>
-            <Link
-              href="/about"
-              className="inline-flex items-center text-cyan-400 text-xs sm:text-sm font-semibold mt-4 hover:underline"
-            >
-              Read More About Us <ChevronRight className="w-4 h-4 ml-1" />
-            </Link>
+      {/* 4. Patient Testimonials */}
+      <section className="py-16 sm:py-20 px-4 sm:px-6 bg-[#f1f7f9] border-y border-slate-200/80">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-teal-700">PATIENT FEEDBACK</span>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">What Our Patients Say</h2>
+            <p className="text-xs sm:text-sm text-slate-500">Real recovery stories and feedback from families treated at Gavane Hospital.</p>
           </div>
-          <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-slate-700/60 h-60 sm:h-72">
-            <img
-              src="https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=1200&q=80"
-              alt="Gavane Hospital Campus Facility"
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end p-4">
-              <span className="text-xs font-bold text-white tracking-wide">🏥 Gavane Hospital Campus Facility</span>
-            </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                quote: "The cardiology department responded swiftly during my father's emergency. Dr. Ananya Rao's diagnosis was precise, and the ICU nursing staff provided great care.",
+                name: "Mayur Jadhav",
+                location: "Hadapsar, Pune",
+                treatment: "Cardiac Care & CCU",
+              },
+              {
+                quote: "Seamless patient registration, minimal waiting time at the OPD desk, and computerized prescriptions. Truly a modern and caring hospital.",
+                name: "Ramesh Kulkarni",
+                location: "Solapur Road, Pune",
+                treatment: "General Medicine OPD",
+              },
+              {
+                quote: "Underwent laparoscopic surgery under Dr. Sudhir Gavane. The post-operative recovery was smooth and the billing was transparent without hidden costs.",
+                name: "Sunita Deshmukh",
+                location: "Magarpatta, Pune",
+                treatment: "General Surgery",
+              },
+            ].map((t, idx) => (
+              <div key={idx} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="flex text-amber-400 mb-3">
+                    {[...Array(5)].map((_, index) => (
+                      <Star key={index} className="w-4 h-4 fill-current" />
+                    ))}
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-600 italic leading-relaxed">
+                    &quot;{t.quote}&quot;
+                  </p>
+                </div>
+                <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-end">
+                  <div>
+                    <div className="font-extrabold text-xs text-slate-900">{t.name}</div>
+                    <div className="text-[10px] text-slate-400">{t.location}</div>
+                  </div>
+                  <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                    {t.treatment}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Facilities & Infrastructure */}
-      <section id="facilities" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto w-full">
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 border-l-4 border-cyan-500 pl-3">
-          Facilities & Infrastructure
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-          {[
-            { name: "Modular Operation Theatres", img: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=600&q=80" },
-            { name: "24/7 Central Pharmacy", img: "https://images.unsplash.com/photo-1586015555751-63bb77f4322a?auto=format&fit=crop&w=600&q=80" },
-            { name: "Advanced ICU & CCU Units", img: "https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=600&q=80" },
-            { name: "3 Tesla MRI & Diagnostic Wing", img: "https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=600&q=80" },
-          ].map((item, i) => (
-            <div key={i} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden group hover:border-cyan-500/50 transition-all">
-              <div className="h-40 overflow-hidden relative">
-                <img src={item.img} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-              </div>
-              <div className="p-4">
-                <h3 className="font-bold text-sm text-white">{item.name}</h3>
-                <span className="text-[11px] text-teal-400 font-semibold mt-1 block">✔ Operational & Verified</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="mt-auto bg-slate-900 border-t border-slate-800 text-slate-400 py-10 sm:py-12 px-4 sm:px-6">
+      {/* 5. Modern Clinical Footer */}
+      <footer className="mt-auto bg-[#0b1b2b] text-slate-400 py-12 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 text-sm">
           <div>
-            <h3 className="text-white font-bold text-base mb-3">Gavane Hospital</h3>
+            <div className="text-white font-black text-base tracking-tight mb-3">
+              GAVANE<span className="text-teal-400">HOSPITAL</span>
+            </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              NABH accredited multi-specialty institution offering round-the-clock emergency, digital EHR, and outpatient clinical care.
+              NABH-accredited multi-specialty healthcare institution offering emergency trauma, digital clinical management, and dedicated outpatient care.
             </p>
           </div>
           <div>
-            <h4 className="text-white font-semibold mb-3">Quick Links</h4>
+            <h4 className="text-white font-bold text-xs uppercase tracking-wider mb-3">Quick Links</h4>
             <ul className="space-y-2 text-xs">
-              <li><Link href="/about" className="hover:text-cyan-400 transition-colors">About Us</Link></li>
-              <li><Link href="/#facilities" className="hover:text-cyan-400 transition-colors">Facilities</Link></li>
-              <li><Link href="/dashboard/patient" className="hover:text-cyan-400 transition-colors">Patient Portal</Link></li>
+              <li><Link href="/about" className="hover:text-teal-400 transition-colors">About Gavane Hospital</Link></li>
+              <li><Link href="/#services" className="hover:text-teal-400 transition-colors">Core Services</Link></li>
+              <li><Link href="/#facilities" className="hover:text-teal-400 transition-colors">Medical Facilities</Link></li>
+              <li><Link href="/#doctors" className="hover:text-teal-400 transition-colors">Specialist Doctors</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="text-white font-semibold mb-3">Contact</h4>
+            <h4 className="text-white font-bold text-xs uppercase tracking-wider mb-3">Campus Contact</h4>
             <ul className="space-y-2 text-xs">
-              <li className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-cyan-400 shrink-0" /> Healthcare City, MH</li>
-              <li className="flex items-center"><Phone className="w-4 h-4 mr-2 text-cyan-400 shrink-0" /> +91 0240 2484 888</li>
-              <li className="flex items-center"><Mail className="w-4 h-4 mr-2 text-cyan-400 shrink-0" /> info@gavanehospital.in</li>
+              <li className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-teal-400 shrink-0" /> Hadapsar, Pune, MH</li>
+              <li className="flex items-center"><Phone className="w-4 h-4 mr-2 text-teal-400 shrink-0" /> +91 0240 2484 888</li>
+              <li className="flex items-center"><Mail className="w-4 h-4 mr-2 text-teal-400 shrink-0" /> info@gavanehospital.in</li>
             </ul>
           </div>
           <div>
-            <h4 className="text-white font-semibold mb-3">Emergency Care</h4>
+            <h4 className="text-white font-bold text-xs uppercase tracking-wider mb-3">Emergency Triage</h4>
             <p className="text-xs text-slate-400 leading-relaxed">24/7 Trauma, ICU, and Ambulance Service available.</p>
-            <p className="text-cyan-400 font-bold mt-2 text-base sm:text-lg">Call: +91 0240 2484 888</p>
+            <p className="text-teal-400 font-extrabold mt-2 text-base">Call: +91 0240 2484 888</p>
           </div>
+        </div>
+        <div className="text-center text-xs border-t border-slate-800/80 mt-10 pt-6 text-slate-500">
+          Designed & Engineered by Shourya Technologies • Gavane Hospital & Research Centre
         </div>
       </footer>
 
-      {/* Appointment Booking Pop-up Modal */}
+      {/* Shared Instant Appointment Booking Modal */}
       <AppointmentBookingModal
         isOpen={showBookingModal}
         onClose={() => setShowBookingModal(false)}
         onSuccess={(msg) => {
           setFeedback(msg);
-          setTimeout(() => setFeedback(null), 5000);
+          setTimeout(() => setFeedback(null), 6000);
         }}
       />
     </div>
