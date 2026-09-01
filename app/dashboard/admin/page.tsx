@@ -65,6 +65,7 @@ export default function AdminDashboardPage() {
   const [certificates, setCertificates] = useState<SharedCertificate[]>([]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Dynamic Context-Aware Modal State
   const [showModal, setShowModal] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editTargetId, setEditTargetId] = useState<string | null>(null);
@@ -85,14 +86,92 @@ export default function AdminDashboardPage() {
     loadData();
   }, [loadData]);
 
+  // Context-Aware Field Configurator
+  const getModalConfig = () => {
+    switch (activeModule) {
+      case "Registration":
+        return {
+          title: isEditing ? "Edit Patient Record" : "Register New Patient Record",
+          l1: "Patient Full Legal Name", p1: "e.g. Mayur Jadhav",
+          l2: "Contact Mobile Number", p2: "e.g. +91 98765 43210",
+          l3: "Clinical Department / Specialty", p3: "e.g. Cardiology Dept",
+          l4: "Assigned Consultant Doctor", p4: "e.g. Dr. Priya",
+          l5: "Triage Findings / Vitals Notes", p5: "e.g. BP: 120/80 • Routine Triage Cleared",
+        };
+      case "Doctors":
+        return {
+          title: isEditing ? "Edit Doctor Profile" : "Register Consultant Doctor",
+          l1: "Doctor Full Name & Title", p1: "e.g. Dr. Ananya Rao",
+          l2: "Degree / Medical Qualifications", p2: "e.g. MBBS, MD (Cardiology)",
+          l3: "Specialty Department", p3: "e.g. Cardiology Dept",
+          l4: "Official Email / Username", p4: "e.g. ananya@gavanehospital.in",
+          l5: "Standard Consultation Fee (₹)", p5: "e.g. ₹500",
+        };
+      case "Support":
+        return {
+          title: isEditing ? "Edit Staff Record" : "Register Support Staff Personnel",
+          l1: "Staff Legal Name", p1: "e.g. Rajesh Patil",
+          l2: "Designation / Role", p2: "e.g. Senior Front Desk Executive",
+          l3: "Assigned Unit / Triage Location", p3: "e.g. Main Reception & Triage",
+          l4: "Contact Phone Number", p4: "e.g. +91 91567 44415",
+          l5: "Shift Schedule", p5: "e.g. Morning Shift (08:00 - 16:00)",
+        };
+      case "Medical":
+        return {
+          title: isEditing ? "Edit Medical Officer" : "Register Pharmacist / Medical Officer",
+          l1: "Pharmacist / Officer Name", p1: "e.g. Priya Nair",
+          l2: "Role / Degree", p2: "e.g. Chief Pharmacist (B.Pharm)",
+          l3: "Depot Unit Assignment", p3: "e.g. Central Pharmacy Depot",
+          l4: "Pharmacy License / Batch", p4: "e.g. Lic: MH-PH-88912",
+          l5: "Official Email Address", p5: "e.g. priya.nair@gavanehospital.in",
+        };
+      case "Certificates":
+        return {
+          title: isEditing ? "Edit Certificate" : "Issue / Record Medical Certificate",
+          l1: "Certificate Title", p1: "e.g. Medical Fitness Certificate",
+          l2: "Citizen Beneficiary Name", p2: "e.g. Ramesh Jadhav",
+          l3: "Clinical Purpose / Reason", p3: "e.g. Pre-Employment Medical Clearance",
+          l4: "Issued Timestamp", p4: "28/08/2026",
+          l5: "Authorizing Consultant Doctor", p5: "Dr. Sudhir Gavane",
+        };
+      case "Stock":
+        return {
+          title: isEditing ? "Edit Stock Item" : "Add Medication to Pharmacy Stock",
+          l1: "Medication & Strength Name", p1: "e.g. Tab. Paracetamol 650mg (Dolo)",
+          l2: "SKU Identifier Code", p2: "e.g. TAB-DOLO-650",
+          l3: "Dosage Form & Packaging", p3: "e.g. Oral Tablet • Strip of 15",
+          l4: "Stock Quantity & Unit MRP", p4: "e.g. 4,500 Units • ₹2.50/unit",
+          l5: "Batch Code & Expiry Date", p5: "e.g. Batch: BAT-2026-X01 • Exp: 12/2027",
+        };
+      case "Billing":
+        return {
+          title: isEditing ? "Edit Invoice Record" : "Generate Billing Invoice",
+          l1: "Patient Legal Name", p1: "e.g. Ramesh Kulkarni",
+          l2: "Service / Procedure Description", p2: "e.g. General OPD Consultation Fee",
+          l3: "Net Amount (₹ INR)", p3: "e.g. ₹500.00",
+          l4: "Billing Counter / Payment Mode", p4: "e.g. UPI QR (PhonePe) • Front Counter 1",
+          l5: "Settlement Remarks / Receipt", p5: "e.g. Cleared & Paid Confirmed",
+        };
+      default:
+        return {
+          title: isEditing ? `Edit ${activeModule} Entry` : `Create ${activeModule} Entry`,
+          l1: "Primary Title / Subject Name", p1: "Enter primary subject name...",
+          l2: "Specification / Classification", p2: "Enter details...",
+          l3: "Department / Section", p3: "Enter department...",
+          l4: "Operational Values / Contact", p4: "Enter parameters...",
+          l5: "Clinical Remarks / Officer Notes", p5: "Enter remarks...",
+        };
+    }
+  };
+
   const handleOpenAdd = () => {
     setIsEditing(false);
     setEditTargetId(null);
     setFormCol1("");
     setFormCol2("");
-    setFormCol3("");
-    setFormCol4("");
-    setFormCol5("");
+    setFormCol3(activeModule === "Registration" ? "Cardiology Dept" : activeModule === "Certificates" ? "Medical Clearance" : "");
+    setFormCol4(activeModule === "Registration" ? "Dr. Priya" : activeModule === "Certificates" ? "28/08/2026" : "");
+    setFormCol5(activeModule === "Registration" ? "BP 120/80 • Standard Triage" : activeModule === "Certificates" ? "Dr. Priya" : "");
     setFormStatus("Active");
     setShowModal(true);
   };
@@ -115,8 +194,8 @@ export default function AdminDashboardPage() {
     if (activeModule === "Registration") {
       const randomSuffix = Math.floor(100 + Math.random() * 900);
       const newPt: SharedPatient = {
-        id: `pat-${Date.now()}`,
-        reference_id: `GH-2026-REG${randomSuffix}`,
+        id: editTargetId || `pat-${Date.now()}`,
+        reference_id: isEditing && editTargetId ? (patients.find((p) => p.id === editTargetId)?.reference_id || `GH-2026-REG${randomSuffix}`) : `GH-2026-REG${randomSuffix}`,
         full_name: formCol1,
         phone: formCol2 || "+91 98000 00000",
         department: formCol3 || "General OPD",
@@ -127,7 +206,7 @@ export default function AdminDashboardPage() {
       };
       const updated = await saveSharedPatient(newPt);
       setPatients(updated);
-      setFeedback({ type: "success", text: `Patient ${formCol1} saved.` });
+      setFeedback({ type: "success", text: `Patient ${formCol1} saved and synced across all portals.` });
       setShowModal(false);
       return;
     }
@@ -136,7 +215,7 @@ export default function AdminDashboardPage() {
       const randomSuffix = Math.floor(100 + Math.random() * 900);
       const certObj: SharedCertificate = {
         id: editTargetId || `cert-${Date.now()}`,
-        reference_id: `GH-2026-${randomSuffix}`,
+        reference_id: isEditing && editTargetId ? (certificates.find((c) => c.id === editTargetId)?.reference_id || `GH-2026-${randomSuffix}`) : `GH-2026-${randomSuffix}`,
         certificate_title: formCol1,
         patient_name: formCol2,
         purpose: formCol3,
@@ -178,6 +257,8 @@ export default function AdminDashboardPage() {
     setDataStore(updated);
     setFeedback({ type: "success", text: `Removed ${name} from ${activeModule}.` });
   };
+
+  const modalConfig = getModalConfig();
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col font-sans text-slate-800">
@@ -274,7 +355,7 @@ export default function AdminDashboardPage() {
                 className="flex-1 sm:flex-none px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <span>+</span>
-                <span>Add {activeModule} Entry</span>
+                <span>Add {activeModule === "Registration" ? "Patient" : activeModule === "Certificates" ? "Certificate" : `${activeModule} Entry`}</span>
               </button>
             </div>
           </div>
@@ -286,7 +367,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* Clean Dedicated Router */}
+          {/* Dedicated Views */}
           {activeModule === "MASTER" && (
             <MasterOverview
               records={dataStore.MASTER || []}
@@ -447,23 +528,29 @@ export default function AdminDashboardPage() {
         <div>Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span></div>
       </footer>
 
-      {/* Dynamic Creation / Edit Modal */}
+      {/* Context-Aware Professional Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 sm:p-6 space-y-4 my-auto max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-base font-extrabold text-slate-900">
-                {isEditing ? `Edit ${activeModule} Entry` : `New ${activeModule} Entry`}
-              </h3>
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                  Target: {activeModule} Console
+                </span>
+                <h3 className="text-base font-extrabold text-slate-900 mt-1">
+                  {modalConfig.title}
+                </h3>
+              </div>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
             </div>
 
             <form onSubmit={handleSaveModal} className="space-y-3.5">
               <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Primary Name / Title *</label>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">{modalConfig.l1} *</label>
                 <input
                   type="text"
                   required
+                  placeholder={modalConfig.p1}
                   value={formCol1}
                   onChange={(e) => setFormCol1(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -472,20 +559,22 @@ export default function AdminDashboardPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 2 *</label>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">{modalConfig.l2} *</label>
                   <input
                     type="text"
                     required
+                    placeholder={modalConfig.p2}
                     value={formCol2}
                     onChange={(e) => setFormCol2(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 3 *</label>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">{modalConfig.l3} *</label>
                   <input
                     type="text"
                     required
+                    placeholder={modalConfig.p3}
                     value={formCol3}
                     onChange={(e) => setFormCol3(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -495,20 +584,22 @@ export default function AdminDashboardPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 4 *</label>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">{modalConfig.l4} *</label>
                   <input
                     type="text"
                     required
+                    placeholder={modalConfig.p4}
                     value={formCol4}
                     onChange={(e) => setFormCol4(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Field 5 *</label>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">{modalConfig.l5} *</label>
                   <input
                     type="text"
                     required
+                    placeholder={modalConfig.p5}
                     value={formCol5}
                     onChange={(e) => setFormCol5(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -517,16 +608,16 @@ export default function AdminDashboardPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Status *</label>
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Status Flag *</label>
                 <select
                   value={formStatus}
                   onChange={(e) => setFormStatus(e.target.value as "Active" | "Pending" | "Completed" | "Suspended")}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                 >
                   <option value="Active">Active / Cleared</option>
-                  <option value="Pending">Pending Review</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Suspended">Suspended</option>
+                  <option value="Pending">Pending Review / Triage</option>
+                  <option value="Completed">Completed / Archived</option>
+                  <option value="Suspended">Suspended / Inactive</option>
                 </select>
               </div>
 
@@ -538,7 +629,7 @@ export default function AdminDashboardPage() {
                   type="submit"
                   className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
                 >
-                  {isEditing ? "Save Changes" : `Commit Entry`}
+                  {isEditing ? "Save Changes" : `Commit Entry to ${activeModule}`}
                 </button>
               </div>
             </form>
