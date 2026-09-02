@@ -35,6 +35,12 @@ import {
   deleteSharedCertificate,
   SharedCertificate,
 } from "@/lib/sync/certificatesSync";
+import {
+  getSharedDoctors,
+  saveSharedDoctor,
+  deleteSharedDoctor,
+  SharedDoctor,
+} from "@/lib/sync/doctorsSync";
 
 const ADMIN_MODULES: SidebarModule[] = [
   { id: "MASTER", label: "MASTER", icon: "🏢", adminBadge: false },
@@ -56,23 +62,13 @@ const ADMIN_MODULES: SidebarModule[] = [
 ];
 
 export const HOSPITAL_DEPARTMENTS = [
-  "Cardiology Dept",
-  "General Medicine",
-  "General Surgery",
-  "Orthopedics Ward",
-  "Pediatrics & Neonatal",
-  "Neurology & Stroke",
+  "Cardiology & Cardiac Sciences",
+  "General Surgery & Trauma",
+  "General Medicine & Pediatrics",
+  "Orthopedics & Joint Replacement",
+  "Neurology & Neurosciences",
   "Radiology & Imaging",
   "Pathology Laboratory",
-  "Trauma & Emergency",
-];
-
-export const HOSPITAL_DOCTORS = [
-  "Dr. Priya",
-  "Dr. Ananya Rao",
-  "Dr. Sudhir Gavane",
-  "Dr. Elena Rostova",
-  "Dr. Rajesh Kumar",
 ];
 
 export default function AdminDashboardPage() {
@@ -83,6 +79,7 @@ export default function AdminDashboardPage() {
   const [dataStore, setDataStore] = useState<Record<string, UnifiedRecord[]>>({});
   const [patients, setPatients] = useState<SharedPatient[]>([]);
   const [certificates, setCertificates] = useState<SharedCertificate[]>([]);
+  const [doctorsList, setDoctorsList] = useState<SharedDoctor[]>([]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Dynamic Context-Aware Modal State
@@ -92,19 +89,33 @@ export default function AdminDashboardPage() {
   const [formCol1, setFormCol1] = useState("");
   const [formCol2, setFormCol2] = useState("");
   const [formCol3, setFormCol3] = useState(HOSPITAL_DEPARTMENTS[0]);
-  const [formCol4, setFormCol4] = useState(HOSPITAL_DOCTORS[0]);
+  const [formCol4, setFormCol4] = useState("");
   const [formCol5, setFormCol5] = useState("");
+  const [formImage, setFormImage] = useState("");
   const [formStatus, setFormStatus] = useState<"Active" | "Pending" | "Completed" | "Suspended">("Active");
 
   const loadData = useCallback(async () => {
     setDataStore(getUniversalStore());
     setPatients(await getSharedPatients());
     setCertificates(await getSharedCertificates());
+    setDoctorsList(await getSharedDoctors());
   }, []);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Handle Image Upload & Convert to Base64
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleOpenAdd = () => {
     setIsEditing(false);
@@ -112,8 +123,13 @@ export default function AdminDashboardPage() {
     setFormCol1("");
     setFormCol2("");
     setFormCol3(HOSPITAL_DEPARTMENTS[0]);
-    setFormCol4(HOSPITAL_DOCTORS[0]);
-    setFormCol5(activeModule === "Registration" ? "BP: 120/80 • Standard Triage" : "");
+    setFormCol4("");
+    setFormCol5(activeModule === "Doctors" ? "₹500" : "");
+    setFormImage(
+      activeModule === "Doctors"
+        ? "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80"
+        : ""
+    );
     setFormStatus("Active");
     setShowModal(true);
   };
@@ -126,7 +142,21 @@ export default function AdminDashboardPage() {
     setFormCol3(item.col3);
     setFormCol4(item.col4);
     setFormCol5(item.col5);
+    setFormImage("");
     setFormStatus(item.status);
+    setShowModal(true);
+  };
+
+  const handleOpenEditDoctor = (doc: SharedDoctor) => {
+    setIsEditing(true);
+    setEditTargetId(doc.id);
+    setFormCol1(doc.name);
+    setFormCol2(doc.degree);
+    setFormCol3(doc.department);
+    setFormCol4(doc.email);
+    setFormCol5(doc.fee);
+    setFormImage(doc.image);
+    setFormStatus(doc.status);
     setShowModal(true);
   };
 
@@ -138,6 +168,7 @@ export default function AdminDashboardPage() {
     setFormCol3(p.department);
     setFormCol4(p.assigned_doctor);
     setFormCol5(p.notes);
+    setFormImage("");
     setFormStatus(p.status);
     setShowModal(true);
   };
@@ -145,15 +176,50 @@ export default function AdminDashboardPage() {
   const handleSaveModal = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // 1. Doctors Module Submission
+    if (activeModule === "Doctors") {
+      const randomSuffix = Math.floor(100 + Math.random() * 900);
+      const docObj: SharedDoctor = {
+        id: editTargetId || `doc-${Date.now()}`,
+        reference_id:
+          isEditing && editTargetId
+            ? doctorsList.find((d) => d.id === editTargetId)?.reference_id || `GH-2026-${randomSuffix}`
+            : `GH-2026-${randomSuffix}`,
+        name: formCol1.trim(),
+        degree: formCol2.trim(),
+        department: formCol3,
+        email: formCol4.trim() || `${formCol1.toLowerCase().replace(/[^a-z]/g, "")}@gavanehospital.in`,
+        fee: formCol5.trim() || "₹500",
+        image:
+          formImage ||
+          "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80",
+        status: formStatus === "Active" ? "Active" : "Pending",
+        created_at: new Date().toLocaleDateString("en-IN"),
+      };
+
+      const updated = await saveSharedDoctor(docObj);
+      setDoctorsList(updated);
+      setFeedback({
+        type: "success",
+        text: `Doctor ${docObj.name} saved! Profile is now synchronized on Homepage and About Us.`,
+      });
+      setShowModal(false);
+      return;
+    }
+
+    // 2. Registration Submission
     if (activeModule === "Registration") {
       const randomSuffix = Math.floor(100 + Math.random() * 900);
       const newPt: SharedPatient = {
         id: editTargetId || `pat-${Date.now()}`,
-        reference_id: isEditing && editTargetId ? (patients.find((p) => p.id === editTargetId)?.reference_id || `GH-2026-REG${randomSuffix}`) : `GH-2026-REG${randomSuffix}`,
-        full_name: formCol1,
-        phone: formCol2 || "+91 98000 00000",
+        reference_id:
+          isEditing && editTargetId
+            ? patients.find((p) => p.id === editTargetId)?.reference_id || `GH-2026-REG${randomSuffix}`
+            : `GH-2026-REG${randomSuffix}`,
+        full_name: formCol1.trim(),
+        phone: formCol2.trim() || "+91 98000 00000",
         department: formCol3,
-        assigned_doctor: formCol4,
+        assigned_doctor: formCol4 || (doctorsList[0]?.name || "Dr. Priya"),
         notes: formCol5 || "BP: 120/80 • Standard Triage",
         status: formStatus === "Pending" ? "Pending" : "Active",
         created_at: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
@@ -165,16 +231,20 @@ export default function AdminDashboardPage() {
       return;
     }
 
+    // 3. Certificates Submission
     if (activeModule === "Certificates") {
       const randomSuffix = Math.floor(100 + Math.random() * 900);
       const certObj: SharedCertificate = {
         id: editTargetId || `cert-${Date.now()}`,
-        reference_id: isEditing && editTargetId ? (certificates.find((c) => c.id === editTargetId)?.reference_id || `GH-2026-${randomSuffix}`) : `GH-2026-${randomSuffix}`,
+        reference_id:
+          isEditing && editTargetId
+            ? certificates.find((c) => c.id === editTargetId)?.reference_id || `GH-2026-${randomSuffix}`
+            : `GH-2026-${randomSuffix}`,
         certificate_title: formCol1,
         patient_name: formCol2,
         purpose: formCol3,
         issued_date: formCol4 || "28/08/2026",
-        authorizing_doctor: formCol5 || "Dr. Sudhir Gavane",
+        authorizing_doctor: formCol5 || (doctorsList[0]?.name || "Dr. Sudhir Gavane"),
         status: formStatus,
         created_at: new Date().toLocaleDateString("en-IN"),
       };
@@ -185,10 +255,14 @@ export default function AdminDashboardPage() {
       return;
     }
 
+    // 4. Fallback Generic Module Submission
     const randomSuffix = Math.floor(100 + Math.random() * 900);
     const newRecord: UnifiedRecord = {
       id: editTargetId || `${activeModule.toLowerCase()}-${Date.now()}`,
-      reference_id: isEditing && editTargetId ? (dataStore[activeModule]?.find((r) => r.id === editTargetId)?.reference_id || `GH-2026-${randomSuffix}`) : `GH-2026-${randomSuffix}`,
+      reference_id:
+        isEditing && editTargetId
+          ? dataStore[activeModule]?.find((r) => r.id === editTargetId)?.reference_id || `GH-2026-${randomSuffix}`
+          : `GH-2026-${randomSuffix}`,
       category: activeModule,
       col1: formCol1,
       col2: formCol2,
@@ -307,7 +381,7 @@ export default function AdminDashboardPage() {
                 className="flex-1 sm:flex-none px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
               >
                 <span>+</span>
-                <span>Add {activeModule === "Registration" ? "Patient" : activeModule === "Certificates" ? "Certificate" : `${activeModule} Entry`}</span>
+                <span>Add {activeModule === "Doctors" ? "Doctor" : activeModule === "Registration" ? "Patient" : `${activeModule} Entry`}</span>
               </button>
             </div>
           </div>
@@ -327,7 +401,7 @@ export default function AdminDashboardPage() {
               onSearchChange={setSearchTerm}
               onOpenEdit={handleOpenEdit}
               onDelete={handleDelete}
-              activeDoctorsCount={dataStore.Doctors?.length || 2}
+              activeDoctorsCount={doctorsList.length}
               totalRegisteredPatients={patients.length}
               activeOtCount={dataStore.OT?.length || 1}
             />
@@ -335,11 +409,16 @@ export default function AdminDashboardPage() {
 
           {activeModule === "Doctors" && (
             <DoctorsManagement
-              records={dataStore.Doctors || []}
+              records={doctorsList}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onOpenEdit={handleOpenEdit}
-              onDelete={handleDelete}
+              onOpenEdit={handleOpenEditDoctor}
+              onDelete={async (id, name) => {
+                if (!confirm(`Delete doctor ${name}?`)) return;
+                const updated = await deleteSharedDoctor(id);
+                setDoctorsList(updated);
+                setFeedback({ type: "success", text: `Removed doctor ${name}.` });
+              }}
             />
           )}
 
@@ -481,7 +560,7 @@ export default function AdminDashboardPage() {
         <div>Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span></div>
       </footer>
 
-      {/* Professional Registration & Domain Modal */}
+      {/* Streamlined Professional Modal with Image Upload */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 sm:p-6 space-y-4 my-auto max-h-[90vh] overflow-y-auto">
@@ -491,7 +570,11 @@ export default function AdminDashboardPage() {
                   Target: {activeModule} Console
                 </span>
                 <h3 className="text-base font-extrabold text-slate-900 mt-1">
-                  {activeModule === "Registration"
+                  {activeModule === "Doctors"
+                    ? isEditing
+                      ? "Edit Doctor Profile"
+                      : "Register Specialist Doctor"
+                    : activeModule === "Registration"
                     ? isEditing
                       ? "Edit Patient Record"
                       : "Register New Patient Record"
@@ -504,8 +587,108 @@ export default function AdminDashboardPage() {
             </div>
 
             <form onSubmit={handleSaveModal} className="space-y-3.5">
-              {/* Patient Registration Fields */}
-              {activeModule === "Registration" ? (
+              {/* 1. DOCTORS MODAL (Streamlined with Picture Upload) */}
+              {activeModule === "Doctors" ? (
+                <>
+                  {/* Photo Preview and Upload */}
+                  <div className="flex items-center space-x-4 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-teal-500 bg-slate-200 shrink-0 shadow-xs">
+                      {formImage ? (
+                        <img src={formImage} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-bold">
+                          No Photo
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase">
+                        Doctor Portrait Photo *
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageFileChange}
+                        className="block w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-teal-600 file:text-white hover:file:bg-teal-700 cursor-pointer"
+                      />
+                      <p className="text-[10px] text-slate-400">Upload a professional portrait (PNG, JPG, WebP)</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                      Doctor Name & Title *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Dr. Ananya Rao"
+                      value={formCol1}
+                      onChange={(e) => setFormCol1(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                        Degree / Qualification *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. MBBS, MD (Cardiology), FACC"
+                        value={formCol2}
+                        onChange={(e) => setFormCol2(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                        Specialty Department *
+                      </label>
+                      <select
+                        value={formCol3}
+                        onChange={(e) => setFormCol3(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                      >
+                        {HOSPITAL_DEPARTMENTS.map((dept, idx) => (
+                          <option key={idx} value={dept}>{dept}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                        Official Email / Username
+                      </label>
+                      <input
+                        type="email"
+                        placeholder="ananya@gavanehospital.in"
+                        value={formCol4}
+                        onChange={(e) => setFormCol4(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                        OPD Consultation Fee *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="₹500"
+                        value={formCol5}
+                        onChange={(e) => setFormCol5(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-bold text-teal-800 focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : activeModule === "Registration" ? (
+                /* 2. REGISTRATION MODAL */
                 <>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
@@ -561,8 +744,8 @@ export default function AdminDashboardPage() {
                         onChange={(e) => setFormCol4(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                       >
-                        {HOSPITAL_DOCTORS.map((doc, idx) => (
-                          <option key={idx} value={doc}>{doc}</option>
+                        {doctorsList.map((doc) => (
+                          <option key={doc.id} value={doc.name}>{doc.name}</option>
                         ))}
                       </select>
                     </div>
@@ -581,7 +764,7 @@ export default function AdminDashboardPage() {
                   </div>
                 </>
               ) : (
-                /* Generic Domain Fields */
+                /* 3. OTHER MODULES */
                 <>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Primary Title / Name *</label>
@@ -619,7 +802,7 @@ export default function AdminDashboardPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Contact / Units / Time *</label>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Contact / Details *</label>
                       <input
                         type="text"
                         required
@@ -629,7 +812,7 @@ export default function AdminDashboardPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Fee / Expiry / Notes *</label>
+                      <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Fee / Remarks *</label>
                       <input
                         type="text"
                         required
@@ -650,7 +833,7 @@ export default function AdminDashboardPage() {
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
                 >
                   <option value="Active">Active / Cleared</option>
-                  <option value="Pending">Pending Review / Triage</option>
+                  <option value="Pending">Pending Review / Verification</option>
                   <option value="Completed">Completed / Archived</option>
                   <option value="Suspended">Suspended / Inactive</option>
                 </select>
@@ -664,7 +847,7 @@ export default function AdminDashboardPage() {
                   type="submit"
                   className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
                 >
-                  {isEditing ? "Save Changes" : `Commit Entry to ${activeModule}`}
+                  {isEditing ? "Save Changes" : `Commit Entry`}
                 </button>
               </div>
             </form>

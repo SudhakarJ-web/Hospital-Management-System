@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
-  Award, ShieldCheck, HeartPulse, Stethoscope, Building2, 
-  CheckCircle2, Target, Eye, Compass, Phone, Mail, MapPin, 
-  ArrowRight, Calendar, Sparkles, Users, Clock
+  Building2, CheckCircle2, Target, Eye, Compass, Phone, Mail, MapPin, 
+  Sparkles
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import AppointmentBookingModal from "@/components/AppointmentBookingModal";
+import { getSharedDoctors, SharedDoctor } from "@/lib/sync/doctorsSync";
 
 export default function AboutPage() {
   const [isMounted, setIsMounted] = useState(false);
@@ -16,9 +16,15 @@ export default function AboutPage() {
   const [selectedDoctor, setSelectedDoctor] = useState("Dr. Ananya Rao");
   const [selectedDepartment, setSelectedDepartment] = useState("Cardiology & Cardiac Sciences");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [doctors, setDoctors] = useState<SharedDoctor[]>([]);
 
   useEffect(() => {
     setIsMounted(true);
+    async function loadDocs() {
+      const liveDocs = await getSharedDoctors();
+      setDoctors(liveDocs.filter((d) => d.status === "Active"));
+    }
+    loadDocs();
   }, []);
 
   const handleOpenDoctorBooking = (docName: string, deptName: string) => {
@@ -31,10 +37,8 @@ export default function AboutPage() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col selection:bg-teal-500 selection:text-white">
-      {/* Top Navigation */}
       <Navbar />
 
-      {/* Floating Feedback Notification */}
       {feedback && (
         <div className="fixed top-20 right-4 z-50 p-4 bg-emerald-600 text-white rounded-2xl shadow-2xl text-xs font-bold flex items-center space-x-2 animate-in slide-in-from-top duration-300">
           <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
@@ -113,7 +117,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* 2. Institutional Heritage & Campus Infrastructure */}
+      {/* 2. Institutional Heritage */}
       <section className="py-16 sm:py-20 px-4 sm:px-6 bg-[#f1f7f9] border-y border-slate-200/80">
         <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-8 md:gap-12 items-center">
           <div className="relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 h-72 sm:h-96">
@@ -163,7 +167,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* 3. Leadership & Medical Board */}
+      {/* 3. DYNAMICALLY SYNCHRONIZED Leadership & Medical Board */}
       <section className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
           <span className="text-xs font-extrabold uppercase tracking-widest text-teal-600">LEADERSHIP TEAM</span>
@@ -175,52 +179,33 @@ export default function AboutPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[
-            {
-              name: "Dr. Sudhir Gavane",
-              role: "Chief Surgical Specialist & Founder",
-              degree: "MS (General & Laparoscopic Surgery), M.Ch",
-              dept: "General Surgery & Trauma",
-              image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=800&q=80",
-              bio: "Over 20 years of surgical experience specializing in minimally invasive laparoscopic abdominal interventions and polytrauma management.",
-            },
-            {
-              name: "Dr. Ananya Rao",
-              role: "Chief of Medical Staff",
-              degree: "MBBS, MD (Cardiology), FACC",
-              dept: "Cardiology & Cardiac Sciences",
-              image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=800&q=80",
-              bio: "Senior Interventional Cardiologist specializing in acute coronary triage, preventative heart care, and critical cardiac interventions.",
-            },
-            {
-              name: "Dr. Priya",
-              role: "Director of Clinical Operations",
-              degree: "MD (Internal Medicine & Pediatrics)",
-              dept: "General Medicine & Pediatrics",
-              image: "https://images.unsplash.com/photo-1594824813629-9e8c45f448ea?auto=format&fit=crop&w=800&q=80",
-              bio: "Consultant Physician championing evidence-based pediatric care, lifestyle medicine protocols, and automated outpatient workflows.",
-            },
-          ].map((leader, i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {doctors.map((leader) => (
             <div
-              key={i}
+              key={leader.id}
               className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm hover:shadow-lg hover:border-teal-400 transition-all text-center flex flex-col justify-between"
             >
               <div>
-                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full mx-auto mb-4 overflow-hidden border-3 border-teal-500 shadow-md">
-                  <img src={leader.image} alt={leader.name} className="w-full h-full object-cover" />
+                <div className="w-28 h-28 rounded-full mx-auto mb-4 overflow-hidden border-3 border-teal-500 shadow-md bg-slate-100">
+                  {leader.image ? (
+                    <img src={leader.image} alt={leader.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm font-bold">
+                      {leader.name.charAt(0)}
+                    </div>
+                  )}
                 </div>
                 <h3 className="text-lg font-extrabold text-slate-900">{leader.name}</h3>
-                <p className="text-xs text-teal-700 font-bold mt-0.5">{leader.role}</p>
+                <p className="text-xs text-teal-700 font-bold mt-0.5">{leader.degree}</p>
                 <div className="mt-2 inline-block px-3 py-1 bg-teal-50 text-teal-800 text-[10px] font-extrabold rounded-full border border-teal-200">
-                  {leader.degree}
+                  {leader.department}
                 </div>
-                <p className="text-xs text-slate-500 mt-3 leading-relaxed">{leader.bio}</p>
+                <p className="text-xs text-slate-500 mt-2 font-semibold">OPD Fee: {leader.fee}</p>
               </div>
 
               <button
                 type="button"
-                onClick={() => handleOpenDoctorBooking(leader.name, leader.dept)}
+                onClick={() => handleOpenDoctorBooking(leader.name, leader.department)}
                 className="mt-6 w-full py-2.5 bg-slate-900 hover:bg-teal-600 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
               >
                 Book with {leader.name.split(" ")[1] || "Doctor"}
@@ -243,7 +228,7 @@ export default function AboutPage() {
               <p className="text-xs text-slate-500 font-bold mt-1 uppercase">Surgeries Concluded</p>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-              <p className="text-3xl sm:text-4xl font-black text-teal-600">50+</p>
+              <p className="text-3xl sm:text-4xl font-black text-teal-600">{doctors.length}+</p>
               <p className="text-xs text-slate-500 font-bold mt-1 uppercase">Specialist Consultants</p>
             </div>
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
@@ -265,7 +250,7 @@ export default function AboutPage() {
         <div className="flex flex-col sm:flex-row justify-center gap-3.5 max-w-sm sm:max-w-none mx-auto">
           <button
             type="button"
-            onClick={() => handleOpenDoctorBooking("Dr. Ananya Rao", "Cardiology & Cardiac Sciences")}
+            onClick={() => handleOpenDoctorBooking(doctors[0]?.name || "Dr. Ananya Rao", doctors[0]?.department || "Cardiology & Cardiac Sciences")}
             className="px-8 py-3.5 bg-teal-600 hover:bg-teal-700 text-white font-extrabold rounded-2xl shadow-lg shadow-teal-600/20 transition-all active:scale-95 text-xs sm:text-sm cursor-pointer"
           >
             Book Appointment
@@ -284,7 +269,7 @@ export default function AboutPage() {
         <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 text-sm">
           <div>
             <div className="text-white font-black text-base tracking-tight mb-3">
-              GAVANE <span className="text-teal-400">HOSPITAL</span>
+              GAVANE<span className="text-teal-400">HOSPITAL</span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
               NABH-accredited multi-specialty healthcare institution offering emergency trauma, digital clinical management, and dedicated outpatient care.
@@ -318,7 +303,6 @@ export default function AboutPage() {
         </div>
       </footer>
 
-      {/* Auto-Populated Appointment Booking Modal */}
       <AppointmentBookingModal
         isOpen={showBookingModal}
         onClose={() => setShowBookingModal(false)}
