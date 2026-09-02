@@ -91,6 +91,7 @@ export default function AdminDashboardPage() {
   const [formCol3, setFormCol3] = useState(HOSPITAL_DEPARTMENTS[0]);
   const [formCol4, setFormCol4] = useState("");
   const [formCol5, setFormCol5] = useState("");
+  const [doctorPassword, setDoctorPassword] = useState("password123"); // Admin-set password
   const [formImage, setFormImage] = useState("");
   const [formStatus, setFormStatus] = useState<"Active" | "Pending" | "Completed" | "Suspended">("Active");
 
@@ -105,7 +106,6 @@ export default function AdminDashboardPage() {
     loadData();
   }, [loadData]);
 
-  // Handle Image Upload & Convert to Base64
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -125,6 +125,7 @@ export default function AdminDashboardPage() {
     setFormCol3(HOSPITAL_DEPARTMENTS[0]);
     setFormCol4("");
     setFormCol5(activeModule === "Doctors" ? "₹500" : "");
+    setDoctorPassword("password123");
     setFormImage(
       activeModule === "Doctors"
         ? "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80"
@@ -155,6 +156,7 @@ export default function AdminDashboardPage() {
     setFormCol3(doc.department);
     setFormCol4(doc.email);
     setFormCol5(doc.fee);
+    setDoctorPassword(doc.password || "password123");
     setFormImage(doc.image);
     setFormStatus(doc.status);
     setShowModal(true);
@@ -176,7 +178,7 @@ export default function AdminDashboardPage() {
   const handleSaveModal = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. Doctors Module Submission
+    // 1. Doctors Module Submission with Password
     if (activeModule === "Doctors") {
       const randomSuffix = Math.floor(100 + Math.random() * 900);
       const docObj: SharedDoctor = {
@@ -189,6 +191,7 @@ export default function AdminDashboardPage() {
         degree: formCol2.trim(),
         department: formCol3,
         email: formCol4.trim() || `${formCol1.toLowerCase().replace(/[^a-z]/g, "")}@gavanehospital.in`,
+        password: doctorPassword.trim() || "password123",
         fee: formCol5.trim() || "₹500",
         image:
           formImage ||
@@ -201,13 +204,13 @@ export default function AdminDashboardPage() {
       setDoctorsList(updated);
       setFeedback({
         type: "success",
-        text: `Doctor ${docObj.name} saved! Profile is now synchronized on Homepage and About Us.`,
+        text: `Doctor ${docObj.name} saved! Login credentials configured successfully.`,
       });
       setShowModal(false);
       return;
     }
 
-    // 2. Registration Submission
+    // 2. Patient Registration Submission
     if (activeModule === "Registration") {
       const randomSuffix = Math.floor(100 + Math.random() * 900);
       const newPt: SharedPatient = {
@@ -303,7 +306,7 @@ export default function AdminDashboardPage() {
         </div>
         <button
           onClick={() => setMobileMenuOpen((prev) => !prev)}
-          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center space-x-1"
+          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center space-x-1 cursor-pointer"
         >
           <span>{mobileMenuOpen ? "✕ Close" : "☰ Switch Module"}</span>
         </button>
@@ -560,7 +563,7 @@ export default function AdminDashboardPage() {
         <div>Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span></div>
       </footer>
 
-      {/* Streamlined Professional Modal with Image Upload */}
+      {/* Streamlined Modal with Dedicated Password & Image Inputs */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 sm:p-6 space-y-4 my-auto max-h-[90vh] overflow-y-auto">
@@ -572,7 +575,7 @@ export default function AdminDashboardPage() {
                 <h3 className="text-base font-extrabold text-slate-900 mt-1">
                   {activeModule === "Doctors"
                     ? isEditing
-                      ? "Edit Doctor Profile"
+                      ? "Edit Doctor Credentials"
                       : "Register Specialist Doctor"
                     : activeModule === "Registration"
                     ? isEditing
@@ -587,14 +590,14 @@ export default function AdminDashboardPage() {
             </div>
 
             <form onSubmit={handleSaveModal} className="space-y-3.5">
-              {/* 1. DOCTORS MODAL (Streamlined with Picture Upload) */}
+              {/* 1. DOCTORS CONSOLE (Clean, Dedicated Fields + Password + Image) */}
               {activeModule === "Doctors" ? (
                 <>
                   {/* Photo Preview and Upload */}
                   <div className="flex items-center space-x-4 p-3 bg-slate-50 border border-slate-200 rounded-xl">
                     <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-teal-500 bg-slate-200 shrink-0 shadow-xs">
                       {formImage ? (
-                        <img src={formImage} alt="Preview" className="w-full h-full object-cover" />
+                        <img src={formImage} alt="Doctor Preview" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-bold">
                           No Photo
@@ -611,13 +614,13 @@ export default function AdminDashboardPage() {
                         onChange={handleImageFileChange}
                         className="block w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-teal-600 file:text-white hover:file:bg-teal-700 cursor-pointer"
                       />
-                      <p className="text-[10px] text-slate-400">Upload a professional portrait (PNG, JPG, WebP)</p>
+                      <p className="text-[10px] text-slate-400">PNG, JPG, or WebP portrait</p>
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                      Doctor Name & Title *
+                      Doctor Full Name & Title *
                     </label>
                     <input
                       type="text"
@@ -637,7 +640,7 @@ export default function AdminDashboardPage() {
                       <input
                         type="text"
                         required
-                        placeholder="e.g. MBBS, MD (Cardiology), FACC"
+                        placeholder="e.g. MBBS, MD (Cardiology)"
                         value={formCol2}
                         onChange={(e) => setFormCol2(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -662,11 +665,12 @@ export default function AdminDashboardPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                        Official Email / Username
+                        Doctor Login Email / Username *
                       </label>
                       <input
                         type="email"
-                        placeholder="ananya@gavanehospital.in"
+                        required
+                        placeholder="e.g. ananya@gavanehospital.in"
                         value={formCol4}
                         onChange={(e) => setFormCol4(e.target.value)}
                         className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -674,21 +678,35 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                        OPD Consultation Fee *
+                        Portal Access Password *
                       </label>
                       <input
                         type="text"
                         required
-                        placeholder="₹500"
-                        value={formCol5}
-                        onChange={(e) => setFormCol5(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-bold text-teal-800 focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                        placeholder="Set password for doctor..."
+                        value={doctorPassword}
+                        onChange={(e) => setDoctorPassword(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-bold text-teal-800 focus:ring-2 focus:ring-teal-600 focus:outline-none font-mono"
                       />
                     </div>
                   </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                      OPD Consultation Fee *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. ₹500"
+                      value={formCol5}
+                      onChange={(e) => setFormCol5(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                    />
+                  </div>
                 </>
               ) : activeModule === "Registration" ? (
-                /* 2. REGISTRATION MODAL */
+                /* 2. PATIENT REGISTRATION */
                 <>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">

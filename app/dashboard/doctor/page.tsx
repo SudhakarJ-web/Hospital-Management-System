@@ -19,6 +19,7 @@ import { getSharedPatients, saveSharedPatient, deleteSharedPatient, SharedPatien
 import { getSharedCertificates, deleteSharedCertificate, SharedCertificate } from "@/lib/sync/certificatesSync";
 import { getSharedPrescriptions, dispensePrescription, SharedPrescription } from "@/lib/sync/prescriptionsSync";
 import { getSharedAppointments, deleteSharedAppointment, SharedAppointment } from "@/lib/sync/appointmentsSync";
+import { getCurrentDoctorSession } from "@/lib/sync/doctorsSync";
 import { supabase } from "@/lib/supabase";
 
 const DOCTOR_SIDEBAR_MODULES: SidebarModule[] = [
@@ -37,23 +38,15 @@ const DOCTOR_SIDEBAR_MODULES: SidebarModule[] = [
   { id: "CERTIFICATES", label: "CERTIFICATES", icon: "📄" },
 ];
 
-const DOCTOR_DEPARTMENT_LOOKUP: Record<string, string> = {
-  "Dr. Priya": "Cardiology Dept",
-  "Dr. Ananya Rao": "Cardiology & Cardiac Sciences",
-  "Dr. Sudhir Gavane": "General Surgery & Trauma",
-  "Dr. Elena Rostova": "Neurology & Stroke",
-  "Dr. Rajesh Kumar": "Orthopedics & Joint Replacement",
-};
-
 export default function DoctorDashboardPage() {
   const [activeModule, setActiveModule] = useState<string>("OPD");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
-  // Doctor Profile Session State
-  const [doctorName, setDoctorName] = useState<string>("Dr. Priya");
-  const [doctorEmail, setDoctorEmail] = useState<string>("priya@gmail.com");
-  const [doctorDept, setDoctorDept] = useState<string>("Cardiology Dept");
+  // Dynamic Session State for Logged-In Doctor
+  const [doctorName, setDoctorName] = useState<string>("Dr. Ananya Rao");
+  const [doctorEmail, setDoctorEmail] = useState<string>("ananya@gavanehospital.in");
+  const [doctorDept, setDoctorDept] = useState<string>("Cardiology & Cardiac Sciences");
 
   // Domain Store States
   const [dataStore, setDataStore] = useState<Record<string, UnifiedRecord[]>>({});
@@ -71,23 +64,28 @@ export default function DoctorDashboardPage() {
   const [regPhone, setRegPhone] = useState("");
   const [regVitals, setRegVitals] = useState("BP: 120/80 • Cleared for Consultation");
 
-  // 1. Resolve Doctor Authentication Session
+  // 1. Resolve Active Logged-In Doctor Session
   useEffect(() => {
     async function resolveDoctorSession() {
+      // First check local dedicated doctor session from Gateway login
+      const activeDoctorSession = getCurrentDoctorSession();
+      if (activeDoctorSession) {
+        setDoctorName(activeDoctorSession.name);
+        setDoctorEmail(activeDoctorSession.email);
+        setDoctorDept(activeDoctorSession.department);
+        return;
+      }
+
+      // Fallback to Supabase Auth if session exists
       try {
         const { data } = await supabase.auth.getUser();
         if (data?.user) {
           const metaName = data.user.user_metadata?.full_name || data.user.user_metadata?.name;
-          if (metaName) {
-            setDoctorName(metaName);
-            if (DOCTOR_DEPARTMENT_LOOKUP[metaName]) {
-              setDoctorDept(DOCTOR_DEPARTMENT_LOOKUP[metaName]);
-            }
-          }
+          if (metaName) setDoctorName(metaName);
           if (data.user.email) setDoctorEmail(data.user.email);
         }
       } catch {
-        // Fallback to defaults
+        // Fallback to initial state
       }
     }
     resolveDoctorSession();
@@ -132,7 +130,10 @@ export default function DoctorDashboardPage() {
     const randomSuffix = Math.floor(100 + Math.random() * 900);
     const ptObj: SharedPatient = {
       id: editPtId || `pat-${Date.now()}`,
-      reference_id: isEditingPt && editPtId ? (patients.find((p) => p.id === editPtId)?.reference_id || `GH-2026-REG${randomSuffix}`) : `GH-2026-REG${randomSuffix}`,
+      reference_id:
+        isEditingPt && editPtId
+          ? patients.find((p) => p.id === editPtId)?.reference_id || `GH-2026-REG${randomSuffix}`
+          : `GH-2026-REG${randomSuffix}`,
       full_name: regName.trim(),
       phone: regPhone.trim() || "+91 98000 00000",
       department: doctorDept,
@@ -183,7 +184,7 @@ export default function DoctorDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col font-sans text-slate-800">
-      {/* Header */}
+      {/* Dynamic Header showing logged-in doctor credentials */}
       <DashboardHeader
         roleIcon="🩺"
         loggedAsText={`${doctorName} (${doctorEmail})`}
@@ -194,7 +195,7 @@ export default function DoctorDashboardPage() {
       {/* Mobile Switch Drawer Trigger */}
       <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-2 text-xs font-bold text-white truncate">
-          <span className="text-teal-400">🩺 Workspace:</span>
+          <span className="text-teal-400">🩺 Active:</span>
           <span className="uppercase text-teal-300 truncate">
             {DOCTOR_SIDEBAR_MODULES.find((m) => m.id === activeModule)?.label || activeModule}
           </span>

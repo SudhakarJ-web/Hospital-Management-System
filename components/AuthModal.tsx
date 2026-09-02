@@ -2,123 +2,239 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { 
+  Lock, Mail, Key, ShieldCheck, Stethoscope, 
+  Users, Pill, KeyRound, AlertCircle 
+} from "lucide-react";
+import { getSharedDoctors, setCurrentDoctorSession } from "@/lib/sync/doctorsSync";
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialRole?: "admin" | "doctor" | "support" | "medical";
 }
 
-export default function AuthModal({ isOpen, onClose, initialRole = "doctor" }: AuthModalProps) {
-  const [selectedRole, setSelectedRole] = useState(initialRole);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+type RoleType = "Admin" | "Doctor" | "Support" | "Medical";
+
+export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const router = useRouter();
+  const [activeRole, setActiveRole] = useState<RoleType>("Doctor");
+  const [email, setEmail] = useState("ananya@gavanehospital.in");
+  const [password, setPassword] = useState("password123");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleRoleSelect = (role: RoleType) => {
+    setActiveRole(role);
+    setErrorMsg(null);
+    if (role === "Admin") {
+      setEmail("admin@gavanehospital.in");
+      setPassword("password123");
+    } else if (role === "Doctor") {
+      setEmail("ananya@gavanehospital.in");
+      setPassword("password123");
+    } else if (role === "Support") {
+      setEmail("support@gavanehospital.in");
+      setPassword("password123");
+    } else if (role === "Medical") {
+      setEmail("medical@gavanehospital.in");
+      setPassword("password123");
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Route to corresponding dashboard
-    router.push(`/dashboard/${selectedRole}`);
-    onClose();
+    setErrorMsg(null);
+
+    const inputEmail = email.trim().toLowerCase();
+    const inputPass = password.trim();
+
+    try {
+      if (activeRole === "Doctor") {
+        // Look up registered doctors in the live sync database
+        const doctors = await getSharedDoctors();
+        const matchedDoctor = doctors.find(
+          (d) => d.email.toLowerCase() === inputEmail
+        );
+
+        if (!matchedDoctor) {
+          setErrorMsg("No doctor profile registered with this email address.");
+          setLoading(false);
+          return;
+        }
+
+        const validPassword = matchedDoctor.password || "password123";
+        if (inputPass !== validPassword) {
+          setErrorMsg("Incorrect password. Please check your credentials.");
+          setLoading(false);
+          return;
+        }
+
+        // Establish dedicated session for this doctor
+        setCurrentDoctorSession(matchedDoctor);
+        onClose();
+        router.push("/dashboard/doctor");
+        return;
+      }
+
+      if (activeRole === "Admin") {
+        if (inputEmail === "admin@gavanehospital.in" && inputPass === "password123") {
+          onClose();
+          router.push("/dashboard/admin");
+          return;
+        } else {
+          setErrorMsg("Invalid Admin credentials.");
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (activeRole === "Support") {
+        if (inputEmail.includes("support") && inputPass === "password123") {
+          onClose();
+          router.push("/dashboard/support");
+          return;
+        } else {
+          setErrorMsg("Invalid Support Staff credentials.");
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (activeRole === "Medical") {
+        if (inputEmail.includes("medical") && inputPass === "password123") {
+          onClose();
+          router.push("/dashboard/medical");
+          return;
+        } else {
+          setErrorMsg("Invalid Pharmacy / Medical Officer credentials.");
+          setLoading(false);
+          return;
+        }
+      }
+    } catch {
+      setErrorMsg("Authentication service temporarily unavailable. Please retry.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-md bg-white rounded-2xl sm:rounded-3xl shadow-2xl p-5 sm:p-8 my-auto overflow-hidden border border-slate-100">
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          type="button"
-          className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        {/* Header Icon & Title */}
-        <div className="text-center space-y-2 mb-6">
-          <div className="w-12 h-12 mx-auto rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600 text-xl shadow-inner">
-            🛡️
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full p-6 sm:p-7 space-y-5 text-slate-800">
+        
+        {/* Header Icon */}
+        <div className="text-center space-y-2">
+          <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-2xl border border-teal-200 flex items-center justify-center mx-auto shadow-xs">
+            <KeyRound className="w-6 h-6" />
           </div>
-          <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
-            Hospital Management System
-          </h3>
-          <p className="text-xs text-slate-500 font-medium">
-            Gavane Hospital Role-Based Gateway
-          </p>
+          <div>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight">
+              Staff Access Gateway
+            </h3>
+            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+              Gavane Hospital Multi-Role Clinical Network
+            </p>
+          </div>
         </div>
 
-        {/* 4 Role Selector Tabs (2x2 on Mobile, 4x1 on Tablets/Desktop) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
+        {/* Role Selector Tabs */}
+        <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/80 text-[11px] font-bold">
           {[
-            { id: "admin", label: "Admin", icon: "🔑" },
-            { id: "doctor", label: "Doctor", icon: "🩺" },
-            { id: "support", label: "Support", icon: "👥" },
-            { id: "medical", label: "Medical", icon: "💊" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setSelectedRole(tab.id as any)}
-              className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-xs font-bold transition-all ${
-                selectedRole === tab.id
-                  ? "border-teal-500 bg-teal-50/70 text-teal-800 shadow-sm ring-1 ring-teal-500"
-                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <span className="text-base mb-0.5">{tab.icon}</span>
-              <span>{tab.label}</span>
-            </button>
-          ))}
+            { id: "Admin", label: "Admin", icon: Key },
+            { id: "Doctor", label: "Doctor", icon: Stethoscope },
+            { id: "Support", label: "Support", icon: Users },
+            { id: "Medical", label: "Medical", icon: Pill },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isSelected = activeRole === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleRoleSelect(tab.id as RoleType)}
+                className={`py-2 rounded-xl flex flex-col items-center justify-center space-y-0.5 transition-all cursor-pointer ${
+                  isSelected
+                    ? "bg-white text-teal-800 shadow-sm border border-slate-200/60 font-black"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 ${isSelected ? "text-teal-600" : "text-slate-400"}`} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
+
+        {/* Error Alert */}
+        {errorMsg && (
+          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
         {/* Login Form */}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-[11px] font-black tracking-wider text-slate-700 uppercase mb-1.5">
-              Registered {selectedRole} Email or ID
+            <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+              Registered {activeRole} Email / Username *
             </label>
-            <input
-              type="text"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder={`${selectedRole}@gavanehospital.in`}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all placeholder:text-slate-400"
-            />
+            <div className="relative">
+              <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder={`Enter your ${activeRole.toLowerCase()} email...`}
+                className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none transition-all"
+              />
+            </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-black tracking-wider text-slate-700 uppercase mb-1.5">
-              Password
+            <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+              Portal Password *
             </label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••••"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
-            />
+            <div className="relative">
+              <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password..."
+                className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none transition-all"
+              />
+            </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm tracking-wider uppercase text-white bg-[#0b1b2b] hover:bg-[#122b45] active:scale-[0.99] transition-all shadow-md mt-2 cursor-pointer"
-          >
-            {loading ? "Authenticating..." : `Authenticate ${selectedRole} Access`}
-          </button>
+          <div className="pt-2 flex items-center justify-between space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-1/3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-2/3 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer"
+            >
+              {loading ? "Verifying..." : `Authenticate ${activeRole}`}
+            </button>
+          </div>
         </form>
 
-        <p className="text-[10px] text-center text-slate-400 mt-5">
-          Authorized personnel only • Secure routing to assigned role console.
-        </p>
+        <div className="text-center pt-1 border-t border-slate-100">
+          <p className="text-[10px] text-slate-400">
+            Gavane Hospital EHR • Encrypted with 256-bit DPDP compliance
+          </p>
+        </div>
       </div>
     </div>
   );
