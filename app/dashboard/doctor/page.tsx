@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar, { SidebarModule } from "@/components/dashboard/DashboardSidebar";
 import DoctorClinicalForm from "@/components/dashboard/DoctorClinicalForm";
@@ -20,8 +20,7 @@ import { getSharedPatients, saveSharedPatient, deleteSharedPatient, SharedPatien
 import { getSharedCertificates, deleteSharedCertificate, SharedCertificate } from "@/lib/sync/certificatesSync";
 import { getSharedPrescriptions, dispensePrescription, SharedPrescription } from "@/lib/sync/prescriptionsSync";
 import { getSharedAppointments, deleteSharedAppointment, SharedAppointment } from "@/lib/sync/appointmentsSync";
-import { getCurrentDoctorSession, setCurrentDoctorSession, SharedDoctor } from "@/lib/sync/doctorsSync";
-import { supabase } from "@/lib/supabase";
+import { getSharedDoctors, getCurrentDoctorSession, setCurrentDoctorSession, SharedDoctor } from "@/lib/sync/doctorsSync";
 
 const DOCTOR_SIDEBAR_MODULES: SidebarModule[] = [
   { id: "OPD", label: "OPD CLINICAL DESK", icon: "🩺" },
@@ -39,8 +38,12 @@ const DOCTOR_SIDEBAR_MODULES: SidebarModule[] = [
   { id: "CERTIFICATES", label: "CERTIFICATES", icon: "📄" },
 ];
 
-export default function DoctorDashboardPage() {
+function DoctorDashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryDoctorId = searchParams.get("id");
+  const queryDoctorEmail = searchParams.get("email");
+
   const [activeModule, setActiveModule] = useState<string>("OPD");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
@@ -62,61 +65,56 @@ export default function DoctorDashboardPage() {
   const [regPhone, setRegPhone] = useState("");
   const [regVitals, setRegVitals] = useState("BP: 120/80 • Cleared for Consultation");
 
+  // 1. Resolve Doctor Identity Directly from Query Params or Current Session
   useEffect(() => {
     async function resolveDoctorIdentity() {
+      const allDoctors = await getSharedDoctors();
+
+      // Priority 1: Match from URL Query Parameters
+      if (queryDoctorId) {
+        const found = allDoctors.find((d) => d.id === queryDoctorId);
+        if (found) {
+          setActiveDoctor(found);
+          setCurrentDoctorSession(found);
+          return;
+        }
+      }
+
+      if (queryDoctorEmail) {
+        const found = allDoctors.find(
+          (d) => d.email.toLowerCase() === queryDoctorEmail.toLowerCase()
+        );
+        if (found) {
+          setActiveDoctor(found);
+          setCurrentDoctorSession(found);
+          return;
+        }
+      }
+
+      // Priority 2: Match from Existing LocalStorage Session
       const activeSession = getCurrentDoctorSession();
       if (activeSession) {
-        setActiveDoctor(activeSession);
+        // Re-verify against latest doctors database
+        const foundInDb = allDoctors.find((d) => d.id === activeSession.id || d.email === activeSession.email);
+        const resolved = foundInDb || activeSession;
+        setActiveDoctor(resolved);
         return;
       }
 
-      try {
-        const { data } = await supabase.auth.getUser();
-        if (data?.user) {
-          const email = data.user.email || "doctor@gavanehospital.in";
-          const metaName =
-            data.user.user_metadata?.full_name ||
-            data.user.user_metadata?.name ||
-            "Dr. Specialist";
-
-          const fallbackDoc: SharedDoctor = {
-            id: `doc-${data.user.id}`,
-            reference_id: "GH-DOC-SESSION",
-            name: metaName,
-            degree: "Consultant Physician",
-            department: "General Medicine",
-            email: email,
-            fee: "₹500",
-            image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80",
-            status: "Active",
-            created_at: "Today",
-          };
-          setActiveDoctor(fallbackDoc);
-          return;
-        }
-      } catch {}
-
-      setActiveDoctor({
-        id: "doc-1",
-        reference_id: "GH-2026-001",
-        name: "Dr. Ananya Rao",
-        degree: "MBBS, MD (Cardiology), FACC",
-        department: "Cardiology & Cardiac Sciences",
-        email: "ananya@gavanehospital.in",
-        fee: "₹500",
-        image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80",
-        status: "Active",
-        created_at: "27/08/2026",
-      });
+      // Fallback: Default to first doctor only if no session exists
+      if (allDoctors.length > 0) {
+        setActiveDoctor(allDoctors[0]);
+      }
     }
 
     resolveDoctorIdentity();
-  }, []);
+  }, [queryDoctorId, queryDoctorEmail]);
 
   const doctorName = activeDoctor?.name || "Dr. Specialist";
   const doctorEmail = activeDoctor?.email || "doctor@gavanehospital.in";
   const doctorDept = activeDoctor?.department || "General Medicine";
 
+  // 2. Load Synchronized Clinical Stores
   const loadData = useCallback(async () => {
     setDataStore(getUniversalStore());
     setPatients(await getSharedPatients());
@@ -129,6 +127,7 @@ export default function DoctorDashboardPage() {
     loadData();
   }, [loadData]);
 
+  // 3. Scoped Doctor Data
   const doctorPatients = useMemo(() => {
     if (filterScope === "ALL") return patients;
     return patients.filter((p) => {
@@ -187,7 +186,7 @@ export default function DoctorDashboardPage() {
 
   const handleLogout = () => {
     setCurrentDoctorSession(null);
-    router.push("/");
+    window.location.href = "/";
   };
 
   const handleOpenAddPatient = () => {
@@ -344,7 +343,7 @@ export default function DoctorDashboardPage() {
             <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 px-1 py-0.5 min-w-0">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0"></span>
               <span className="truncate">
-                Portal: <strong className="text-teal-700">{doctorName}</strong> • {doctorDept}
+                Active Physician: <strong className="text-teal-700">{doctorName}</strong> ({doctorDept})
               </span>
             </div>
 
@@ -407,21 +406,20 @@ export default function DoctorDashboardPage() {
             </div>
           )}
 
-         {/* 1. OPD Interactive Clinical Chart Console (Scoped to Doctor) */}
           {activeModule === "OPD" && (
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 overflow-x-auto">
               <DoctorClinicalForm
                 doctorName={doctorName}
                 patients={doctorPatients}
-                onSuccess={(msg: string) => {
+                onSuccess={(msg) => {
                   setFeedback({ type: "success", text: msg });
                   loadData();
                 }}
-                onError={(msg: string) => setFeedback({ type: "error", text: msg })}
+                onError={(msg) => setFeedback({ type: "error", text: msg })}
               />
             </div>
           )}
-          
+
           {activeModule === "APPOINTMENTS" && (
             <AppointmentsView
               appointments={doctorAppointments}
@@ -568,7 +566,7 @@ export default function DoctorDashboardPage() {
                   />
                 </div>
                 <div>
-                  <label className="flex text-[10px] font-bold text-slate-700 uppercase mb-1 items-center justify-between">
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
                     <span>Clinical Department</span>
                     <span className="text-[9px] text-teal-700 font-extrabold bg-teal-100/70 px-1.5 rounded">{"🔒 Locked"}</span>
                   </label>
@@ -582,7 +580,7 @@ export default function DoctorDashboardPage() {
               </div>
 
               <div>
-                <label className="flex text-[10px] font-bold text-slate-700 uppercase mb-1 items-center justify-between">
+                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
                   <span>Assigned Physician</span>
                   <span className="text-[9px] text-teal-700 font-extrabold bg-teal-100/70 px-1.5 rounded">{"🔒 Locked"}</span>
                 </label>
@@ -627,5 +625,13 @@ export default function DoctorDashboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function DoctorDashboardPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center font-bold text-xs text-slate-400">Loading Doctor Console...</div>}>
+      <DoctorDashboardContent />
+    </Suspense>
   );
 }

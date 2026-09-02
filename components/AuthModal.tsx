@@ -3,8 +3,8 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { 
-  Lock, Mail, Key, ShieldCheck, Stethoscope, 
-  Users, Pill, KeyRound, AlertCircle 
+  Lock, Mail, ShieldCheck, Stethoscope, 
+  Users, Pill, KeyRound, AlertCircle, Key 
 } from "lucide-react";
 import { getSharedDoctors, setCurrentDoctorSession } from "@/lib/sync/doctorsSync";
 
@@ -18,7 +18,7 @@ type RoleType = "Admin" | "Doctor" | "Support" | "Medical";
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const router = useRouter();
   const [activeRole, setActiveRole] = useState<RoleType>("Doctor");
-  const [email, setEmail] = useState("ananya@gavanehospital.in");
+  const [email, setEmail] = useState("priya@gavanehospital.in");
   const [password, setPassword] = useState("password123");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -32,7 +32,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       setEmail("admin@gavanehospital.in");
       setPassword("password123");
     } else if (role === "Doctor") {
-      setEmail("ananya@gavanehospital.in");
+      setEmail("priya@gavanehospital.in");
       setPassword("password123");
     } else if (role === "Support") {
       setEmail("support@gavanehospital.in");
@@ -53,10 +53,9 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
     try {
       if (activeRole === "Doctor") {
-        // Look up registered doctors in the live sync database
         const doctors = await getSharedDoctors();
         const matchedDoctor = doctors.find(
-          (d) => d.email.toLowerCase() === inputEmail
+          (d) => d.email.trim().toLowerCase() === inputEmail
         );
 
         if (!matchedDoctor) {
@@ -67,15 +66,17 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
         const validPassword = matchedDoctor.password || "password123";
         if (inputPass !== validPassword) {
-          setErrorMsg("Incorrect password. Please check your credentials.");
+          setErrorMsg("Incorrect password. Please verify your credentials.");
           setLoading(false);
           return;
         }
 
-        // Establish dedicated session for this doctor
+        // Set the active doctor session and pass identifier in the URL
         setCurrentDoctorSession(matchedDoctor);
         onClose();
-        router.push("/dashboard/doctor");
+        
+        // Use window.location.href or router.push with search param for a clean state reset
+        window.location.href = `/dashboard/doctor?id=${encodeURIComponent(matchedDoctor.id)}`;
         return;
       }
 
@@ -124,8 +125,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   return (
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full p-6 sm:p-7 space-y-5 text-slate-800">
-        
-        {/* Header Icon */}
         <div className="text-center space-y-2">
           <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-2xl border border-teal-200 flex items-center justify-center mx-auto shadow-xs">
             <KeyRound className="w-6 h-6" />
@@ -140,7 +139,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </div>
         </div>
 
-        {/* Role Selector Tabs */}
         <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/80 text-[11px] font-bold">
           {[
             { id: "Admin", label: "Admin", icon: Key },
@@ -168,7 +166,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           })}
         </div>
 
-        {/* Error Alert */}
         {errorMsg && (
           <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl flex items-center space-x-2">
             <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
@@ -176,7 +173,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </div>
         )}
 
-        {/* Login Form */}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
