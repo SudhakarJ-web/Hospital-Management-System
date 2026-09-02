@@ -391,7 +391,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 text-sm">
           <div>
             <div className="text-white font-black text-base tracking-tight mb-3">
-              GAVANE<span className="text-teal-400">HOSPITAL</span>
+              GAVANE <span className="text-teal-400">HOSPITAL</span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
               NABH-accredited multi-specialty healthcare institution offering emergency trauma, digital clinical management, and dedicated outpatient care.
