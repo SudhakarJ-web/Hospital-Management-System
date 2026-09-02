@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardSidebar, { SidebarModule } from "@/components/dashboard/DashboardSidebar";
 import DoctorClinicalForm from "@/components/dashboard/DoctorClinicalForm";
@@ -19,7 +20,7 @@ import { getSharedPatients, saveSharedPatient, deleteSharedPatient, SharedPatien
 import { getSharedCertificates, deleteSharedCertificate, SharedCertificate } from "@/lib/sync/certificatesSync";
 import { getSharedPrescriptions, dispensePrescription, SharedPrescription } from "@/lib/sync/prescriptionsSync";
 import { getSharedAppointments, deleteSharedAppointment, SharedAppointment } from "@/lib/sync/appointmentsSync";
-import { getCurrentDoctorSession } from "@/lib/sync/doctorsSync";
+import { getCurrentDoctorSession, setCurrentDoctorSession, SharedDoctor } from "@/lib/sync/doctorsSync";
 import { supabase } from "@/lib/supabase";
 
 const DOCTOR_SIDEBAR_MODULES: SidebarModule[] = [
@@ -39,16 +40,14 @@ const DOCTOR_SIDEBAR_MODULES: SidebarModule[] = [
 ];
 
 export default function DoctorDashboardPage() {
+  const router = useRouter();
   const [activeModule, setActiveModule] = useState<string>("OPD");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [filterScope, setFilterScope] = useState<"MY_PATIENTS" | "ALL">("MY_PATIENTS");
 
-  // Dynamic Session State for Logged-In Doctor
-  const [doctorName, setDoctorName] = useState<string>("Dr. Ananya Rao");
-  const [doctorEmail, setDoctorEmail] = useState<string>("ananya@gavanehospital.in");
-  const [doctorDept, setDoctorDept] = useState<string>("Cardiology & Cardiac Sciences");
+  const [activeDoctor, setActiveDoctor] = useState<SharedDoctor | null>(null);
 
-  // Domain Store States
   const [dataStore, setDataStore] = useState<Record<string, UnifiedRecord[]>>({});
   const [patients, setPatients] = useState<SharedPatient[]>([]);
   const [certificates, setCertificates] = useState<SharedCertificate[]>([]);
@@ -56,7 +55,6 @@ export default function DoctorDashboardPage() {
   const [appointments, setAppointments] = useState<SharedAppointment[]>([]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Doctor Direct Registration & Edit Modal State
   const [showRegModal, setShowRegModal] = useState<boolean>(false);
   const [isEditingPt, setIsEditingPt] = useState<boolean>(false);
   const [editPtId, setEditPtId] = useState<string | null>(null);
@@ -64,34 +62,61 @@ export default function DoctorDashboardPage() {
   const [regPhone, setRegPhone] = useState("");
   const [regVitals, setRegVitals] = useState("BP: 120/80 • Cleared for Consultation");
 
-  // 1. Resolve Active Logged-In Doctor Session
   useEffect(() => {
-    async function resolveDoctorSession() {
-      // First check local dedicated doctor session from Gateway login
-      const activeDoctorSession = getCurrentDoctorSession();
-      if (activeDoctorSession) {
-        setDoctorName(activeDoctorSession.name);
-        setDoctorEmail(activeDoctorSession.email);
-        setDoctorDept(activeDoctorSession.department);
+    async function resolveDoctorIdentity() {
+      const activeSession = getCurrentDoctorSession();
+      if (activeSession) {
+        setActiveDoctor(activeSession);
         return;
       }
 
-      // Fallback to Supabase Auth if session exists
       try {
         const { data } = await supabase.auth.getUser();
         if (data?.user) {
-          const metaName = data.user.user_metadata?.full_name || data.user.user_metadata?.name;
-          if (metaName) setDoctorName(metaName);
-          if (data.user.email) setDoctorEmail(data.user.email);
+          const email = data.user.email || "doctor@gavanehospital.in";
+          const metaName =
+            data.user.user_metadata?.full_name ||
+            data.user.user_metadata?.name ||
+            "Dr. Specialist";
+
+          const fallbackDoc: SharedDoctor = {
+            id: `doc-${data.user.id}`,
+            reference_id: "GH-DOC-SESSION",
+            name: metaName,
+            degree: "Consultant Physician",
+            department: "General Medicine",
+            email: email,
+            fee: "₹500",
+            image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80",
+            status: "Active",
+            created_at: "Today",
+          };
+          setActiveDoctor(fallbackDoc);
+          return;
         }
-      } catch {
-        // Fallback to initial state
-      }
+      } catch {}
+
+      setActiveDoctor({
+        id: "doc-1",
+        reference_id: "GH-2026-001",
+        name: "Dr. Ananya Rao",
+        degree: "MBBS, MD (Cardiology), FACC",
+        department: "Cardiology & Cardiac Sciences",
+        email: "ananya@gavanehospital.in",
+        fee: "₹500",
+        image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80",
+        status: "Active",
+        created_at: "27/08/2026",
+      });
     }
-    resolveDoctorSession();
+
+    resolveDoctorIdentity();
   }, []);
 
-  // 2. Load Synchronized Clinical Stores
+  const doctorName = activeDoctor?.name || "Dr. Specialist";
+  const doctorEmail = activeDoctor?.email || "doctor@gavanehospital.in";
+  const doctorDept = activeDoctor?.department || "General Medicine";
+
   const loadData = useCallback(async () => {
     setDataStore(getUniversalStore());
     setPatients(await getSharedPatients());
@@ -104,7 +129,67 @@ export default function DoctorDashboardPage() {
     loadData();
   }, [loadData]);
 
-  // Open Direct Walk-In Registration
+  const doctorPatients = useMemo(() => {
+    if (filterScope === "ALL") return patients;
+    return patients.filter((p) => {
+      const matchDoc =
+        p.assigned_doctor?.toLowerCase().includes(doctorName.toLowerCase()) ||
+        doctorName.toLowerCase().includes(p.assigned_doctor?.toLowerCase() || "");
+      const matchDept =
+        p.department?.toLowerCase().includes(doctorDept.toLowerCase()) ||
+        doctorDept.toLowerCase().includes(p.department?.toLowerCase() || "");
+      return matchDoc || matchDept;
+    });
+  }, [patients, doctorName, doctorDept, filterScope]);
+
+  const doctorAppointments = useMemo(() => {
+    if (filterScope === "ALL") return appointments;
+    return appointments.filter((a) => {
+      return (
+        a.assigned_doctor?.toLowerCase().includes(doctorName.toLowerCase()) ||
+        doctorName.toLowerCase().includes(a.assigned_doctor?.toLowerCase() || "") ||
+        a.department?.toLowerCase() === doctorDept.toLowerCase()
+      );
+    });
+  }, [appointments, doctorName, doctorDept, filterScope]);
+
+  const doctorPrescriptions = useMemo(() => {
+    if (filterScope === "ALL") return prescriptions;
+    return prescriptions.filter((rx) => {
+      return (
+        rx.prescribing_doctor?.toLowerCase().includes(doctorName.toLowerCase()) ||
+        doctorName.toLowerCase().includes(rx.prescribing_doctor?.toLowerCase() || "")
+      );
+    });
+  }, [prescriptions, doctorName, filterScope]);
+
+  const doctorOtLedger = useMemo(() => {
+    const rawOt = dataStore.OT || [];
+    if (filterScope === "ALL") return rawOt;
+    return rawOt.filter((r) => {
+      return (
+        r.col5?.toLowerCase().includes(doctorName.toLowerCase()) ||
+        doctorName.toLowerCase().includes(r.col5?.toLowerCase() || "")
+      );
+    });
+  }, [dataStore.OT, doctorName, filterScope]);
+
+  const doctorIpdLedger = useMemo(() => {
+    const rawIpd = dataStore.IPD || [];
+    if (filterScope === "ALL") return rawIpd;
+    return rawIpd.filter((r) => {
+      return (
+        r.col5?.toLowerCase().includes(doctorName.toLowerCase()) ||
+        r.col3?.toLowerCase().includes(doctorDept.toLowerCase())
+      );
+    });
+  }, [dataStore.IPD, doctorName, doctorDept, filterScope]);
+
+  const handleLogout = () => {
+    setCurrentDoctorSession(null);
+    router.push("/");
+  };
+
   const handleOpenAddPatient = () => {
     setIsEditingPt(false);
     setEditPtId(null);
@@ -114,7 +199,6 @@ export default function DoctorDashboardPage() {
     setShowRegModal(true);
   };
 
-  // Open Edit Patient Record
   const handleOpenEditPatient = (p: SharedPatient) => {
     setIsEditingPt(true);
     setEditPtId(p.id);
@@ -124,7 +208,6 @@ export default function DoctorDashboardPage() {
     setShowRegModal(true);
   };
 
-  // Commit Patient to Universal Central Ledger
   const handleSavePatientByDoctor = async (e: React.FormEvent) => {
     e.preventDefault();
     const randomSuffix = Math.floor(100 + Math.random() * 900);
@@ -147,7 +230,7 @@ export default function DoctorDashboardPage() {
     setPatients(updated);
     setFeedback({
       type: "success",
-      text: `Patient ${regName} ${isEditingPt ? "updated" : "registered"} successfully. Available in OPD consultation dropdown.`,
+      text: `Patient ${regName} ${isEditingPt ? "updated" : "registered"} successfully in ${doctorName}'s queue.`,
     });
     setShowRegModal(false);
   };
@@ -162,9 +245,9 @@ export default function DoctorDashboardPage() {
   const getHeaders = (mod: string) => {
     switch (mod) {
       case "IPD":
-        return ["Ref ID", "Patient Name", "Bed & Ward No", "Department Ward", "Admission Date", "Clinical Status", "Status", "Controls"];
+        return ["Ref ID", "Patient Name", "Bed & Ward No", "Department Ward", "Admission Date", "Consultant Doctor", "Status", "Controls"];
       case "OT":
-        return ["Ref ID", "Surgical Procedure", "Patient Name", "OT Theater Room", "Scheduled Slot", "Anesthesia / Surgeon", "Status", "Controls"];
+        return ["Ref ID", "Surgical Procedure", "Patient Name", "OT Theater Room", "Scheduled Slot", "Chief Surgeon", "Status", "Controls"];
       case "RADIOLOGY":
         return ["Ref ID", "Imaging Scan", "Patient Name", "Radiology Suite", "Timestamp", "Findings", "Status", "Controls"];
       case "PATHOLOGY":
@@ -182,23 +265,23 @@ export default function DoctorDashboardPage() {
     }
   };
 
+  const activeModuleLabel =
+    DOCTOR_SIDEBAR_MODULES.find((m) => m.id === activeModule)?.label || activeModule;
+
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col font-sans text-slate-800">
-      {/* Dynamic Header showing logged-in doctor credentials */}
       <DashboardHeader
         roleIcon="🩺"
         loggedAsText={`${doctorName} (${doctorEmail})`}
-        roleSubtitle={`${doctorDept} • Physician Console`}
-        bannerText="Physician Clinical EHR & Outpatient Operations Workspace"
+        roleSubtitle={`${doctorDept} • Specialist Console`}
+        bannerText={`Welcome to your clinical workspace, ${doctorName}`}
+        onClose={handleLogout}
       />
 
-      {/* Mobile Switch Drawer Trigger */}
       <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-2 text-xs font-bold text-white truncate">
-          <span className="text-teal-400">🩺 Active:</span>
-          <span className="uppercase text-teal-300 truncate">
-            {DOCTOR_SIDEBAR_MODULES.find((m) => m.id === activeModule)?.label || activeModule}
-          </span>
+          <span className="text-teal-400">🩺 {doctorName}:</span>
+          <span className="uppercase text-teal-300 truncate">{activeModuleLabel}</span>
         </div>
         <button
           onClick={() => setMobileMenuOpen((prev) => !prev)}
@@ -209,7 +292,6 @@ export default function DoctorDashboardPage() {
       </div>
 
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <DashboardSidebar
             modules={DOCTOR_SIDEBAR_MODULES}
@@ -218,16 +300,15 @@ export default function DoctorDashboardPage() {
               setActiveModule(id);
               setSearchTerm("");
             }}
-            sectionTitle="Physician Features"
+            sectionTitle={`${doctorName}'s Modules`}
           />
         </div>
 
-        {/* Mobile Slide-Over Drawer */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 z-50 lg:hidden flex flex-col bg-slate-950/80 backdrop-blur-sm">
             <div className="w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-left duration-200">
               <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
-                <span className="font-bold text-xs uppercase tracking-wider text-teal-400">Doctor Navigation</span>
+                <span className="font-bold text-xs uppercase tracking-wider text-teal-400">{doctorName}</span>
                 <button
                   onClick={() => setMobileMenuOpen(false)}
                   className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 font-bold hover:text-white"
@@ -258,66 +339,92 @@ export default function DoctorDashboardPage() {
           </div>
         )}
 
-        {/* Main Content Workspace */}
         <main className="flex-1 p-3 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 min-w-0">
-          
-          {/* Top Operational Toolbar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-xs">
             <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 px-1 py-0.5 min-w-0">
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0"></span>
               <span className="truncate">
-                Active Clinical Ledger: <strong className="text-teal-700 uppercase">{activeModule}</strong>
+                Portal: <strong className="text-teal-700">{doctorName}</strong> • {doctorDept}
               </span>
             </div>
 
             <div className="flex items-center space-x-2 w-full sm:w-auto justify-end shrink-0">
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-300 text-[11px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setFilterScope("MY_PATIENTS")}
+                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                    filterScope === "MY_PATIENTS"
+                      ? "bg-white text-teal-800 shadow-xs font-black"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  My Caseload ({doctorPatients.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterScope("ALL")}
+                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                    filterScope === "ALL"
+                      ? "bg-white text-teal-800 shadow-xs font-black"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  All Hospital ({patients.length})
+                </button>
+              </div>
+
               <button
                 onClick={loadData}
-                className="flex-1 sm:flex-none px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold rounded-lg transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer"
               >
                 <span>🔄</span>
-                <span>Sync Live Data</span>
+                <span className="hidden sm:inline">Sync Live</span>
               </button>
 
               <button
                 onClick={handleOpenAddPatient}
-                className="flex-1 sm:flex-none px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+                className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center space-x-1 cursor-pointer whitespace-nowrap"
               >
                 <span>+</span>
-                <span>Register New Patient</span>
+                <span>Register Patient</span>
               </button>
             </div>
           </div>
 
-          {/* Feedback Toast */}
           {feedback && (
-            <div className={`p-3 rounded-xl border text-xs font-bold flex justify-between items-center ${
-              feedback.type === "success" ? "bg-emerald-50 border-emerald-300 text-emerald-900" : "bg-rose-50 border-rose-300 text-rose-900"
-            }`}>
+            <div
+              className={`p-3 rounded-xl border text-xs font-bold flex justify-between items-center ${
+                feedback.type === "success"
+                  ? "bg-emerald-50 border-emerald-300 text-emerald-900"
+                  : "bg-rose-50 border-rose-300 text-rose-900"
+              }`}
+            >
               <span>{feedback.text}</span>
-              <button onClick={() => setFeedback(null)} className="font-bold px-2 py-0.5 hover:text-slate-900">✕</button>
+              <button onClick={() => setFeedback(null)} className="font-bold px-2 py-0.5 hover:text-slate-900">
+                ✕
+              </button>
             </div>
           )}
 
-          {/* 1. OPD Interactive Clinical Chart Console */}
+         {/* 1. OPD Interactive Clinical Chart Console (Scoped to Doctor) */}
           {activeModule === "OPD" && (
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 overflow-x-auto">
               <DoctorClinicalForm
                 doctorName={doctorName}
-                patients={patients}
-                onSuccess={(msg) => {
+                patients={doctorPatients}
+                onSuccess={(msg: string) => {
                   setFeedback({ type: "success", text: msg });
                   loadData();
                 }}
-                onError={(msg) => setFeedback({ type: "error", text: msg })}
+                onError={(msg: string) => setFeedback({ type: "error", text: msg })}
               />
             </div>
           )}
-
-          {/* 2. Online Appointments View */}
+          
           {activeModule === "APPOINTMENTS" && (
             <AppointmentsView
-              appointments={appointments}
+              appointments={doctorAppointments}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
               onDeleteAppointment={async (id, name) => {
@@ -329,10 +436,9 @@ export default function DoctorDashboardPage() {
             />
           )}
 
-          {/* 3. Prescription Dispensary Live Status View */}
           {activeModule === "DISPENSARY" && (
             <PrescriptionDispensary
-              prescriptions={prescriptions}
+              prescriptions={doctorPrescriptions}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
               onDispense={async (id, pName) => {
@@ -343,10 +449,9 @@ export default function DoctorDashboardPage() {
             />
           )}
 
-          {/* 4. Universal Patient Registration Ledger */}
           {activeModule === "REGISTRATION" && (
             <RegistrationView
-              patients={patients}
+              patients={doctorPatients}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
               onOpenEditPatient={handleOpenEditPatient}
@@ -359,7 +464,28 @@ export default function DoctorDashboardPage() {
             />
           )}
 
-          {/* 5. Universal Medical Certificates */}
+          {activeModule === "IPD" && (
+            <LedgerTable
+              moduleName="In-Patient (IPD) Admissions"
+              records={doctorIpdLedger}
+              headers={getHeaders("IPD")}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onDelete={handleDeleteRecord}
+            />
+          )}
+
+          {activeModule === "OT" && (
+            <LedgerTable
+              moduleName="Operation Theatre (OT) Suites"
+              records={doctorOtLedger}
+              headers={getHeaders("OT")}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onDelete={handleDeleteRecord}
+            />
+          )}
+
           {activeModule === "CERTIFICATES" && (
             <CertificatesView
               certificates={certificates}
@@ -374,38 +500,39 @@ export default function DoctorDashboardPage() {
             />
           )}
 
-          {/* 6. General Department & Hospital Ledgers */}
-          {!["OPD", "APPOINTMENTS", "DISPENSARY", "REGISTRATION", "CERTIFICATES"].includes(activeModule) && (
+          {!["OPD", "APPOINTMENTS", "DISPENSARY", "REGISTRATION", "IPD", "OT", "CERTIFICATES"].includes(activeModule) && (
             <LedgerTable
               moduleName={activeModule}
               records={dataStore[activeModule] || []}
               headers={getHeaders(activeModule)}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
-              onOpenEdit={() => {}}
               onDelete={handleDeleteRecord}
             />
           )}
         </main>
       </div>
 
-      {/* Footer */}
       <footer className="bg-[#0b1b2b] text-slate-400 px-4 py-2 text-[10px] flex flex-col sm:flex-row items-center justify-between border-t border-slate-800 gap-1 text-center sm:text-left">
-        <div>Current Session :- <strong className="text-teal-400">{doctorName} ({doctorEmail}) • {doctorDept}</strong></div>
-        <div>Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span></div>
+        <div>Logged-in Consultant :- <strong className="text-teal-400">{doctorName} ({doctorEmail}) • {doctorDept}</strong></div>
+        <div>
+          <button onClick={handleLogout} className="text-rose-400 hover:underline font-bold cursor-pointer mr-3">
+            Sign Out
+          </button>
+          Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span>
+        </div>
       </footer>
 
-      {/* Doctor Walk-In Registration & Edit Modal */}
       {showRegModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 sm:p-6 space-y-4 my-auto max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div>
                 <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                  Physician Walk-In Registration
+                  {doctorName} • Clinical Triage
                 </span>
                 <h3 className="text-base font-extrabold text-slate-900 mt-1">
-                  {isEditingPt ? "Edit Patient Clinical Record" : "Register New Patient to Clinical Queue"}
+                  {isEditingPt ? "Edit Patient Clinical Record" : `Register Patient to ${doctorName}'s Queue`}
                 </h3>
               </div>
               <button onClick={() => setShowRegModal(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
@@ -441,9 +568,9 @@ export default function DoctorDashboardPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+                  <label className="flex text-[10px] font-bold text-slate-700 uppercase mb-1 items-center justify-between">
                     <span>Clinical Department</span>
-                    <span className="text-[9px] text-teal-700 font-extrabold bg-teal-100/70 px-1.5 rounded">🔒 Locked</span>
+                    <span className="text-[9px] text-teal-700 font-extrabold bg-teal-100/70 px-1.5 rounded">{"🔒 Locked"}</span>
                   </label>
                   <input
                     type="text"
@@ -455,9 +582,9 @@ export default function DoctorDashboardPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+                <label className="flex text-[10px] font-bold text-slate-700 uppercase mb-1 items-center justify-between">
                   <span>Assigned Physician</span>
-                  <span className="text-[9px] text-teal-700 font-extrabold bg-teal-100/70 px-1.5 rounded">🔒 Locked</span>
+                  <span className="text-[9px] text-teal-700 font-extrabold bg-teal-100/70 px-1.5 rounded">{"🔒 Locked"}</span>
                 </label>
                 <input
                   type="text"
@@ -492,7 +619,7 @@ export default function DoctorDashboardPage() {
                   type="submit"
                   className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
                 >
-                  {isEditingPt ? "Save Patient Changes" : "Confirm & Add to Clinical Queue"}
+                  {isEditingPt ? "Save Patient Changes" : `Add to ${doctorName}'s Queue`}
                 </button>
               </div>
             </form>
