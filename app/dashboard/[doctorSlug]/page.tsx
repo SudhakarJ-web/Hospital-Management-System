@@ -23,7 +23,8 @@ import {
   getSharedDoctors, 
   setCurrentDoctorSession, 
   SharedDoctor,
-  findDoctorBySlug
+  findDoctorBySlug,
+  generateDoctorSlug
 } from "@/lib/sync/doctorsSync";
 
 const DOCTOR_SIDEBAR_MODULES: SidebarModule[] = [
@@ -42,16 +43,16 @@ const DOCTOR_SIDEBAR_MODULES: SidebarModule[] = [
   { id: "CERTIFICATES", label: "CERTIFICATES", icon: "📄" },
 ];
 
-export default function DoctorSlugDashboardPage({
+export default function DynamicDoctorDashboard({
   params,
 }: {
   params: Promise<{ doctorSlug: string }>;
 }) {
   const resolvedParams = use(params);
-  const doctorSlug = resolvedParams?.doctorSlug || "doctor-ananya-rao";
+  const doctorSlug = resolvedParams?.doctorSlug || "doctor-priya";
 
   const [activeModule, setActiveModule] = useState<string>("OPD");
-  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState<string>("" );
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [filterScope, setFilterScope] = useState<"MY_PATIENTS" | "ALL">("MY_PATIENTS");
 
@@ -71,7 +72,6 @@ export default function DoctorSlugDashboardPage({
   const [regPhone, setRegPhone] = useState("");
   const [regVitals, setRegVitals] = useState("BP: 120/80 • Cleared for Consultation");
 
-  // Resolve Doctor directly based on the URL Slug (Priority 1: URL determines the identity)
   useEffect(() => {
     async function resolveDoctor() {
       const allDoctors = await getSharedDoctors();
@@ -104,7 +104,6 @@ export default function DoctorSlugDashboardPage({
     loadData();
   }, [loadData]);
 
-  // Scoped Datasets per Doctor
   const doctorPatients = useMemo(() => {
     if (filterScope === "ALL") return patients;
     return patients.filter((p) => {
@@ -446,6 +445,7 @@ export default function DoctorSlugDashboardPage({
               headers={getHeaders("IPD")}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
+              onOpenEdit={() => {}}
               onDelete={handleDeleteRecord}
             />
           )}
@@ -457,6 +457,7 @@ export default function DoctorSlugDashboardPage({
               headers={getHeaders("OT")}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
+              onOpenEdit={() => {}}
               onDelete={handleDeleteRecord}
             />
           )}
@@ -482,6 +483,7 @@ export default function DoctorSlugDashboardPage({
               headers={getHeaders(activeModule)}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
+              onOpenEdit={() => {}}
               onDelete={handleDeleteRecord}
             />
           )}
