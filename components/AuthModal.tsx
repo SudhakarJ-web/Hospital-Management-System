@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { 
   Lock, Mail, Stethoscope, Users, Pill, KeyRound, AlertCircle, Key 
 } from "lucide-react";
@@ -19,8 +20,9 @@ interface AuthModalProps {
 type RoleType = "Admin" | "Doctor" | "Support" | "Medical";
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
+  const router = useRouter();
   const [activeRole, setActiveRole] = useState<RoleType>("Doctor");
-  const [email, setEmail] = useState("ananya@gavanehospital.in");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("password123");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -31,11 +33,15 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       const docs = await getSharedDoctors();
       const activeDocs = docs.filter((d) => d.status === "Active");
       setAvailableDoctors(activeDocs);
+      if (activeDocs.length > 0 && !email) {
+        setEmail(activeDocs[0].email);
+        setPassword(activeDocs[0].password || "password123");
+      }
     }
     if (isOpen) {
       loadDocs();
     }
-  }, [isOpen]);
+  }, [isOpen, email]);
 
   if (!isOpen) return null;
 
@@ -46,8 +52,9 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       setEmail("admin@gavanehospital.in");
       setPassword("password123");
     } else if (role === "Doctor") {
-      setEmail(availableDoctors[0]?.email || "ananya@gavanehospital.in");
-      setPassword(availableDoctors[0]?.password || "password123");
+      const first = availableDoctors[0];
+      setEmail(first?.email || "ananya@gavanehospital.in");
+      setPassword(first?.password || "password123");
     } else if (role === "Support") {
       setEmail("support@gavanehospital.in");
       setPassword("password123");
@@ -63,7 +70,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setErrorMsg(null);
   };
 
-  const executeLogin = async () => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault(); // Stop native HTML form submission
     if (!email.trim()) {
       setErrorMsg("Please enter your registered email address.");
       return;
@@ -95,20 +103,21 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           return;
         }
 
-        // Establish the doctor session
+        // Persist session
         setCurrentDoctorSession(matchedDoctor);
-        onClose();
 
-        // Target: strictly prefix with /dashboard/
+        // Resolve slug dynamically
         const targetSlug = matchedDoctor.slug || generateDoctorSlug(matchedDoctor.name);
-        window.location.replace(`/dashboard/${targetSlug}`);
+        
+        onClose();
+        router.push(`/dashboard/${targetSlug}`);
         return;
       }
 
       if (activeRole === "Admin") {
         if (inputEmail === "admin@gavanehospital.in" && inputPass === "password123") {
           onClose();
-          window.location.replace("/dashboard/admin");
+          router.push("/dashboard/admin");
           return;
         } else {
           setErrorMsg("Invalid Admin credentials.");
@@ -120,7 +129,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       if (activeRole === "Support") {
         if (inputEmail.includes("support") && inputPass === "password123") {
           onClose();
-          window.location.replace("/dashboard/support");
+          router.push("/dashboard/support");
           return;
         } else {
           setErrorMsg("Invalid Support Staff credentials.");
@@ -132,7 +141,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       if (activeRole === "Medical") {
         if (inputEmail.includes("medical") && inputPass === "password123") {
           onClose();
-          window.location.replace("/dashboard/medical");
+          router.push("/dashboard/medical");
           return;
         } else {
           setErrorMsg("Invalid Pharmacy / Medical Officer credentials.");
@@ -192,11 +201,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           })}
         </div>
 
-        {/* Quick Pick Preset Buttons for Doctors */}
+        {/* Doctor Quick Selector */}
         {activeRole === "Doctor" && availableDoctors.length > 0 && (
           <div className="space-y-1.5">
             <label className="block text-[10px] font-bold text-slate-600 uppercase">
-              Select Doctor Account:
+              Select Physician Account:
             </label>
             <div className="grid grid-cols-3 gap-1.5">
               {availableDoctors.map((d) => {
@@ -227,7 +236,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </div>
         )}
 
-        <div className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
               Registered {activeRole} Email / Username *
@@ -239,12 +248,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    executeLogin();
-                  }
-                }}
                 placeholder={`Enter your ${activeRole.toLowerCase()} email...`}
                 className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none transition-all"
               />
@@ -262,12 +265,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    executeLogin();
-                  }
-                }}
                 placeholder="Enter password..."
                 className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none transition-all"
               />
@@ -283,15 +280,14 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               Cancel
             </button>
             <button
-              type="button"
+              type="submit"
               disabled={loading}
-              onClick={executeLogin}
               className="w-2/3 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer"
             >
               {loading ? "Authenticating..." : `Authenticate ${activeRole} Access`}
             </button>
           </div>
-        </div>
+        </form>
 
         <div className="text-center pt-1 border-t border-slate-100">
           <p className="text-[10px] text-slate-400">

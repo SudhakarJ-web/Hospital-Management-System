@@ -75,11 +75,15 @@ export default function DynamicDoctorDashboard({
   const [regVitals, setRegVitals] = useState("BP: 120/80 • Cleared for Consultation");
 
   useEffect(() => {
-    async function resolveDoctor() {
-      const allDoctors = await getSharedDoctors();
+    let isMounted = true;
 
-      // Find doctor using fuzzy and exact slug matching
+    async function resolveDoctor() {
+      if (!rawSlug) return;
+
+      const allDoctors = await getSharedDoctors();
       const matched = findDoctorBySlug(allDoctors, rawSlug);
+
+      if (!isMounted) return;
 
       if (matched) {
         setActiveDoctor(matched);
@@ -88,18 +92,25 @@ export default function DynamicDoctorDashboard({
         return;
       }
 
-      // Check existing session
       const session = getCurrentDoctorSession();
-      if (session && session.slug) {
-        window.location.replace(`/dashboard/${session.slug}`);
+      if (session) {
+        setActiveDoctor(session);
+        setIsInitializing(false);
         return;
       }
 
-      // If no physician matched and no session exists, send to home
-      window.location.replace("/");
+      if (allDoctors.length > 0) {
+        setActiveDoctor(allDoctors[0]);
+        setCurrentDoctorSession(allDoctors[0]);
+      }
+      setIsInitializing(false);
     }
 
     resolveDoctor();
+
+    return () => {
+      isMounted = false;
+    };
   }, [rawSlug]);
 
   const doctorName = activeDoctor?.name || "Dr. Specialist";
@@ -261,7 +272,7 @@ export default function DynamicDoctorDashboard({
     return (
       <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center space-y-3">
         <div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-bold text-slate-500">Verifying physician console...</p>
+        <p className="text-xs font-bold text-slate-500">Connecting to clinical console...</p>
       </div>
     );
   }
