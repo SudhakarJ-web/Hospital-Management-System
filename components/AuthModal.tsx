@@ -4,8 +4,8 @@ import React, { useState, useEffect } from "react";
 import { 
   Lock, Mail, Stethoscope, Users, Pill, KeyRound, AlertCircle, Key 
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import { 
-  getSharedDoctors, 
   setCurrentDoctorSession, 
   generateDoctorSlug, 
   SharedDoctor 
@@ -20,46 +20,60 @@ type RoleType = "Admin" | "Doctor" | "Support" | "Medical";
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [activeRole, setActiveRole] = useState<RoleType>("Doctor");
-  const [email, setEmail] = useState("ananya@gavanehospital.in");
-  const [password, setPassword] = useState("password123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [availableDoctors, setAvailableDoctors] = useState<SharedDoctor[]>([]);
 
+  // Fetch active doctors directly from Supabase for the modal selector
   useEffect(() => {
-    async function loadDocs() {
-      const docs = await getSharedDoctors();
-      const activeDocs = docs.filter((d) => d.status === "Active");
-      setAvailableDoctors(activeDocs);
+    async function loadLiveDoctors() {
+      try {
+        const { data, error } = await supabase
+          .from("doctors")
+          .select("*")
+          .eq("status", "Active")
+          .order("name", { ascending: true });
+
+        if (!error && data) {
+          setAvailableDoctors(data as SharedDoctor[]);
+          if (data.length > 0 && !email) {
+            setEmail(data[0].email);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch live doctors from Supabase:", err);
+      }
     }
+
     if (isOpen) {
-      loadDocs();
+      loadLiveDoctors();
+      setErrorMsg(null);
     }
-  }, [isOpen]);
+  }, [isOpen, email]);
 
   if (!isOpen) return null;
 
   const handleRoleSelect = (role: RoleType) => {
     setActiveRole(role);
     setErrorMsg(null);
+    setPassword("");
+
     if (role === "Admin") {
       setEmail("admin@gavanehospital.in");
-      setPassword("password123");
     } else if (role === "Doctor") {
-      setEmail(availableDoctors[0]?.email || "ananya@gavanehospital.in");
-      setPassword(availableDoctors[0]?.password || "password123");
+      setEmail(availableDoctors[0]?.email || "");
     } else if (role === "Support") {
       setEmail("support@gavanehospital.in");
-      setPassword("password123");
     } else if (role === "Medical") {
       setEmail("medical@gavanehospital.in");
-      setPassword("password123");
     }
   };
 
   const handleSelectDoctorPreset = (doc: SharedDoctor) => {
     setEmail(doc.email);
-    setPassword(doc.password || "password123");
+    setPassword("");
     setErrorMsg(null);
   };
 
@@ -78,26 +92,41 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     const inputPass = password.trim();
 
     try {
+      // 1. PURE DATABASE AUTHENTICATION FOR DOCTORS
       if (activeRole === "Doctor") {
-        const doctors = await getSharedDoctors();
-        const matchedDoctor = doctors.find(
-          (d) => d.email.trim().toLowerCase() === inputEmail
-        );
+        const { data: matchedDoctor, error } = await supabase
+          .from("doctors")
+          .select("*")
+          .ilike("email", inputEmail)
+          .maybeSingle();
 
-        if (!matchedDoctor) {
+        if (error || !matchedDoctor) {
           setErrorMsg("No doctor profile registered with this email address.");
           setLoading(false);
           return;
         }
 
-        const validPassword = matchedDoctor.password || "password123";
-        if (inputPass !== validPassword) {
+        if (matchedDoctor.status === "Pending") {
+          setErrorMsg("Account pending approval by Hospital Administration.");
+          setLoading(false);
+          return;
+        }
+
+        if (matchedDoctor.status === "Suspended") {
+          setErrorMsg("Account suspended. Please contact Administration.");
+          setLoading(false);
+          return;
+        }
+
+        // Live password verification directly from the database record
+        if (matchedDoctor.password !== inputPass) {
           setErrorMsg("Incorrect password. Please verify your credentials.");
           setLoading(false);
           return;
         }
 
-        setCurrentDoctorSession(matchedDoctor);
+        // Establish session and route directly to the database slug
+        setCurrentDoctorSession(matchedDoctor as SharedDoctor);
         onClose();
 
         const targetSlug = matchedDoctor.slug || generateDoctorSlug(matchedDoctor.name);
@@ -105,40 +134,40 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         return;
       }
 
+      // 2. ADMIN ROLE
       if (activeRole === "Admin") {
-        if (inputEmail === "admin@gavanehospital.in" && inputPass === "password123") {
+        if (inputEmail === "admin@gavanehospital.in" && (inputPass === "Admin@2026" || inputPass === "password123")) {
           onClose();
           window.location.href = "/dashboard/admin";
           return;
-        } else {
-          setErrorMsg("Invalid Admin credentials.");
-          setLoading(false);
-          return;
         }
+        setErrorMsg("Invalid Administrator credentials.");
+        setLoading(false);
+        return;
       }
 
+      // 3. SUPPORT ROLE
       if (activeRole === "Support") {
-        if (inputEmail.includes("support") && inputPass === "password123") {
+        if (inputEmail.includes("support") && (inputPass === "Support@2026" || inputPass === "password123")) {
           onClose();
           window.location.href = "/dashboard/support";
           return;
-        } else {
-          setErrorMsg("Invalid Support Staff credentials.");
-          setLoading(false);
-          return;
         }
+        setErrorMsg("Invalid Support Staff credentials.");
+        setLoading(false);
+        return;
       }
 
+      // 4. MEDICAL ROLE
       if (activeRole === "Medical") {
-        if (inputEmail.includes("medical") && inputPass === "password123") {
+        if (inputEmail.includes("medical") && (inputPass === "Medical@2026" || inputPass === "password123")) {
           onClose();
           window.location.href = "/dashboard/medical";
           return;
-        } else {
-          setErrorMsg("Invalid Pharmacy / Medical Officer credentials.");
-          setLoading(false);
-          return;
         }
+        setErrorMsg("Invalid Pharmacy / Medical Officer credentials.");
+        setLoading(false);
+        return;
       }
     } catch {
       setErrorMsg("Authentication service temporarily unavailable. Please retry.");
@@ -164,6 +193,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </div>
         </div>
 
+        {/* Role Tabs */}
         <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/80 text-[11px] font-bold">
           {[
             { id: "Admin", label: "Admin", icon: Key },
@@ -191,12 +221,13 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           })}
         </div>
 
+        {/* Live Doctor Quick-Pick Buttons fetched from Supabase */}
         {activeRole === "Doctor" && availableDoctors.length > 0 && (
           <div className="space-y-1.5">
             <label className="block text-[10px] font-bold text-slate-600 uppercase">
-              Select Physician Account:
+              Registered Hospital Consultants:
             </label>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-28 overflow-y-auto pr-0.5">
               {availableDoctors.map((d) => {
                 const isCurrent = email.toLowerCase() === d.email.toLowerCase();
                 return (
@@ -225,10 +256,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </div>
         )}
 
+        {/* Auth Form */}
         <form onSubmit={executeLogin} className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-              Registered {activeRole} Email / Username *
+              Registered {activeRole} Email *
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />

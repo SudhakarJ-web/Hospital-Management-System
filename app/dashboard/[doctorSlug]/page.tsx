@@ -10,6 +10,7 @@ import CertificatesView from "@/components/dashboard/shared/CertificatesView";
 import PrescriptionDispensary from "@/components/dashboard/shared/PrescriptionDispensary";
 import AppointmentsView from "@/components/dashboard/shared/AppointmentsView";
 
+import { supabase } from "@/lib/supabase";
 import {
   getUniversalStore,
   deleteUniversalRecord,
@@ -20,12 +21,9 @@ import { getSharedCertificates, deleteSharedCertificate, SharedCertificate } fro
 import { getSharedPrescriptions, dispensePrescription, SharedPrescription } from "@/lib/sync/prescriptionsSync";
 import { getSharedAppointments, deleteSharedAppointment, SharedAppointment } from "@/lib/sync/appointmentsSync";
 import { 
-  getSharedDoctors, 
   getCurrentDoctorSession, 
   setCurrentDoctorSession, 
-  SharedDoctor,
-  findDoctorBySlug,
-  generateDoctorSlug
+  SharedDoctor 
 } from "@/lib/sync/doctorsSync";
 
 const DOCTOR_SIDEBAR_MODULES: SidebarModule[] = [
@@ -50,7 +48,7 @@ export default function DynamicDoctorDashboard({
   params: Promise<{ doctorSlug: string }>;
 }) {
   const resolvedParams = use(params);
-  const rawSlug = resolvedParams?.doctorSlug || "";
+  const rawSlug = (resolvedParams?.doctorSlug || "").trim().toLowerCase();
 
   const [activeModule, setActiveModule] = useState<string>("OPD");
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -74,57 +72,46 @@ export default function DynamicDoctorDashboard({
   const [regPhone, setRegPhone] = useState("");
   const [regVitals, setRegVitals] = useState("BP: 120/80 • Cleared for Consultation");
 
+  // Pure Database Resolution of Doctor by URL slug
   useEffect(() => {
     let isMounted = true;
 
     async function resolveDoctor() {
-      if (!rawSlug) return;
-
-      const allDoctors = await getSharedDoctors();
-      const session = getCurrentDoctorSession();
-
-      // Intercept accidental navigation to /dashboard/doctor
-      if (rawSlug === "doctor" || rawSlug === "doctor/") {
-        if (session && session.email) {
-          const matched = allDoctors.find(
-            (d) => d.email.toLowerCase() === session.email.toLowerCase()
-          ) || session;
-          const slug = matched.slug || generateDoctorSlug(matched.name);
-          window.location.replace(`/dashboard/${slug}`);
-          return;
-        }
+      if (!rawSlug) {
         window.location.replace("/");
         return;
       }
 
-      // Match strictly by the URL slug
-      const matched = findDoctorBySlug(allDoctors, rawSlug);
+      // Query Supabase directly for this slug
+      try {
+        const { data: matched, error } = await supabase
+          .from("doctors")
+          .select("*")
+          .eq("slug", rawSlug)
+          .maybeSingle();
 
-      if (!isMounted) return;
+        if (!isMounted) return;
 
-      if (matched) {
-        setActiveDoctor(matched);
-        setCurrentDoctorSession(matched);
-        setIsInitializing(false);
-        return;
+        if (matched && !error) {
+          setActiveDoctor(matched as SharedDoctor);
+          setCurrentDoctorSession(matched as SharedDoctor);
+          setIsInitializing(false);
+          return;
+        }
+
+        // Secondary fallback to session
+        const session = getCurrentDoctorSession();
+        if (session && session.slug === rawSlug) {
+          setActiveDoctor(session);
+          setIsInitializing(false);
+          return;
+        }
+
+        // Slug does not exist in the database
+        window.location.replace("/");
+      } catch {
+        window.location.replace("/");
       }
-
-      // If URL slug was not found, check for an existing session
-      if (session && session.email) {
-        const sessionDoc = allDoctors.find(
-          (d) => d.email.toLowerCase() === session.email.toLowerCase()
-        ) || session;
-        setActiveDoctor(sessionDoc);
-        setIsInitializing(false);
-        return;
-      }
-
-      // Fallback
-      if (allDoctors.length > 0) {
-        setActiveDoctor(allDoctors[0]);
-        setCurrentDoctorSession(allDoctors[0]);
-      }
-      setIsInitializing(false);
     }
 
     resolveDoctor();
@@ -150,6 +137,7 @@ export default function DynamicDoctorDashboard({
     loadData();
   }, [loadData]);
 
+  // Scoped Data by Active Physician
   const doctorPatients = useMemo(() => {
     if (filterScope === "ALL") return patients;
     return patients.filter((p) => {

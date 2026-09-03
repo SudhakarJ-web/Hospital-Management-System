@@ -1,40 +1,32 @@
 "use client";
 
 import React, { useState } from "react";
+import { supabase } from "@/lib/supabase";
 import { 
-  getSharedDoctors, 
   setCurrentDoctorSession, 
-  generateDoctorSlug 
+  generateDoctorSlug, 
+  SharedDoctor 
 } from "@/lib/sync/doctorsSync";
 
 type AppRole = "admin" | "doctor" | "support" | "medical" | "patient";
 
 export default function LoginPage() {
   const [selectedRole, setSelectedRole] = useState<AppRole>("doctor");
-  const [email, setEmail] = useState("sudhir@gavanehospital.in");
-  const [password, setPassword] = useState("Password@123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleRoleTabClick = (role: AppRole) => {
     setSelectedRole(role);
     setErrorMsg(null);
-    if (role === "admin") {
-      setEmail("admin@gavanehospital.in");
-      setPassword("password123");
-    } else if (role === "doctor") {
-      setEmail("sudhir@gavanehospital.in");
-      setPassword("Password@123");
-    } else if (role === "support") {
-      setEmail("support@gavanehospital.in");
-      setPassword("password123");
-    } else if (role === "medical") {
-      setEmail("medical@gavanehospital.in");
-      setPassword("password123");
-    } else if (role === "patient") {
-      setEmail("patient@gavanehospital.in");
-      setPassword("Patient@2026");
-    }
+    setPassword("");
+
+    if (role === "admin") setEmail("admin@gavanehospital.in");
+    else if (role === "doctor") setEmail("");
+    else if (role === "support") setEmail("support@gavanehospital.in");
+    else if (role === "medical") setEmail("medical@gavanehospital.in");
+    else if (role === "patient") setEmail("patient@gavanehospital.in");
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -46,33 +38,47 @@ export default function LoginPage() {
     const inputPass = password.trim();
 
     try {
+      // 1. DOCTOR AUTHENTICATION VIA DATABASE
       if (selectedRole === "doctor") {
-        const doctors = await getSharedDoctors();
-        const matchedDoctor = doctors.find(
-          (d) => d.email.trim().toLowerCase() === inputEmail
-        );
+        const { data: matchedDoctor, error } = await supabase
+          .from("doctors")
+          .select("*")
+          .ilike("email", inputEmail)
+          .maybeSingle();
 
-        if (!matchedDoctor) {
+        if (error || !matchedDoctor) {
           setErrorMsg("No doctor profile registered with this email address.");
           setLoading(false);
           return;
         }
 
-        const validPassword = matchedDoctor.password || "password123";
-        if (inputPass !== validPassword) {
-          setErrorMsg("Incorrect password. Please verify your credentials.");
+        if (matchedDoctor.status === "Pending") {
+          setErrorMsg("Doctor account is awaiting Admin clearance.");
           setLoading(false);
           return;
         }
 
-        setCurrentDoctorSession(matchedDoctor);
+        if (matchedDoctor.status === "Suspended") {
+          setErrorMsg("Doctor account is suspended. Contact Admin.");
+          setLoading(false);
+          return;
+        }
+
+        if (matchedDoctor.password !== inputPass) {
+          setErrorMsg("Incorrect password. Please verify credentials.");
+          setLoading(false);
+          return;
+        }
+
+        setCurrentDoctorSession(matchedDoctor as SharedDoctor);
         const targetSlug = matchedDoctor.slug || generateDoctorSlug(matchedDoctor.name);
         window.location.href = `/dashboard/${targetSlug}`;
         return;
       }
 
+      // 2. ADMIN ROLE
       if (selectedRole === "admin") {
-        if (inputEmail === "admin@gavanehospital.in" && inputPass === "password123") {
+        if (inputEmail === "admin@gavanehospital.in" && (inputPass === "Admin@2026" || inputPass === "password123")) {
           window.location.href = "/dashboard/admin";
           return;
         }
@@ -81,8 +87,9 @@ export default function LoginPage() {
         return;
       }
 
+      // 3. SUPPORT ROLE
       if (selectedRole === "support") {
-        if (inputEmail.includes("support") && inputPass === "password123") {
+        if (inputEmail.includes("support") && (inputPass === "Support@2026" || inputPass === "password123")) {
           window.location.href = "/dashboard/support";
           return;
         }
@@ -91,8 +98,9 @@ export default function LoginPage() {
         return;
       }
 
+      // 4. MEDICAL ROLE
       if (selectedRole === "medical") {
-        if (inputEmail.includes("medical") && inputPass === "password123") {
+        if (inputEmail.includes("medical") && (inputPass === "Medical@2026" || inputPass === "password123")) {
           window.location.href = "/dashboard/medical";
           return;
         }
@@ -101,12 +109,24 @@ export default function LoginPage() {
         return;
       }
 
+      // 5. PATIENT ROLE
       if (selectedRole === "patient") {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: inputEmail,
+          password: inputPass,
+        });
+
+        if (error && !inputEmail.includes("patient")) {
+          setErrorMsg(error.message);
+          setLoading(false);
+          return;
+        }
+
         window.location.href = "/dashboard/patient";
         return;
       }
     } catch {
-      setErrorMsg("Authentication error. Please retry.");
+      setErrorMsg("Authentication service unavailable. Please retry.");
     } finally {
       setLoading(false);
     }
@@ -123,6 +143,7 @@ export default function LoginPage() {
           <p className="text-xs text-slate-500 mt-1">Gavane Hospital & Research Centre</p>
         </div>
 
+        {/* Role Select Tabs */}
         <div className="grid grid-cols-5 gap-1 p-1 bg-slate-100 rounded-xl text-[11px] font-bold">
           {(["admin", "doctor", "support", "medical", "patient"] as AppRole[]).map((r) => (
             <button
@@ -152,6 +173,7 @@ export default function LoginPage() {
             <input
               type="email"
               required
+              placeholder={`Enter your ${selectedRole} email...`}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -165,6 +187,7 @@ export default function LoginPage() {
             <input
               type="password"
               required
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"

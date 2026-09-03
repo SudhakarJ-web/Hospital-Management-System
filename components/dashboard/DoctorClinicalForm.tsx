@@ -2,10 +2,11 @@
 
 import React, { useState } from "react";
 import { SharedPatient } from "@/lib/sync/patientsSync";
-import { saveSharedPrescription, SharedPrescription } from "@/lib/sync/prescriptionsSync";
+import { saveSharedPrescription } from "@/lib/sync/prescriptionsSync";
 
 interface DoctorClinicalFormProps {
   doctorName: string;
+  doctorId?: string;
   patients: SharedPatient[];
   onSuccess: (msg: string) => void;
   onError: (msg: string) => void;
@@ -26,154 +27,148 @@ const COMMON_INVESTIGATIONS = [
 
 export default function DoctorClinicalForm({
   doctorName,
+  doctorId,
   patients,
   onSuccess,
   onError,
 }: DoctorClinicalFormProps) {
   const [selectedPatientId, setSelectedPatientId] = useState<string>("");
-  const [diagnosis, setDiagnosis] = useState<string>("");
+  const [clinicalAssessment, setClinicalAssessment] = useState<string>("");
   const [selectedTests, setSelectedTests] = useState<string[]>([]);
   const [medications, setMedications] = useState<string>("");
-  const [notes, setNotes] = useState<string>("");
+  const [dietAdvice, setDietAdvice] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const selectedPatient = patients.find((p) => p.id === selectedPatientId);
-
-  const handleTestToggle = (test: string) => {
+  const toggleTest = (test: string) => {
     setSelectedTests((prev) =>
       prev.includes(test) ? prev.filter((t) => t !== test) : [...prev, test]
     );
   };
 
-  const handlePrescriptionSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPatientId || !selectedPatient) {
-      onError("Please select a valid registered patient record.");
+    if (!selectedPatientId) {
+      onError("Please select a registered patient record.");
       return;
     }
 
-    if (!diagnosis.trim()) {
-      onError("Clinical Assessment & Diagnosis field is mandatory.");
+    const patient = patients.find((p) => p.id === selectedPatientId);
+    if (!patient) {
+      onError("Selected patient record could not be found.");
+      return;
+    }
+
+    if (!medications.trim()) {
+      onError("Please provide at least one pharmacological prescription medication.");
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const randomSuffix = Math.floor(100 + Math.random() * 900);
-      const newRx: SharedPrescription = {
-        id: `rx-${Date.now()}`,
-        rx_id: `GH-RX-2026-${randomSuffix}`,
-        patient_id: selectedPatient.reference_id || selectedPatient.id,
-        patient_name: selectedPatient.full_name,
-        age_gender: "Adult / Citizen",
+      // Persist to Supabase prescriptions table
+      await saveSharedPrescription({
+        patient_name: patient.full_name,
+        patient_phone: patient.phone,
         prescribing_doctor: doctorName,
-        department: selectedPatient.department || "General Medicine",
-        diagnosis: diagnosis.trim(),
-        medications: medications.trim() || "Clinical observation & review prescribed.",
-        dosage_notes: notes.trim() + (selectedTests.length > 0 ? `\nLab Orders: ${selectedTests.join(", ")}` : ""),
-        status: "Pending Dispense",
-        issued_at: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
-      };
+        doctor_id: doctorId,
+        department: patient.department,
+        clinical_notes: clinicalAssessment,
+        investigations: selectedTests.join(", "),
+        medications,
+        diet_instructions: dietAdvice,
+        status: "Pending Dispensation",
+      });
 
-      await saveSharedPrescription(newRx);
-      onSuccess(`Prescription & EHR record for ${selectedPatient.full_name} generated and sent to Pharmacy.`);
-      
-      // Reset form
+      onSuccess(`Consultation finalized and Rx transmitted to Pharmacy for ${patient.full_name}.`);
+
+      // Reset form fields
       setSelectedPatientId("");
-      setDiagnosis("");
+      setClinicalAssessment("");
       setSelectedTests([]);
       setMedications("");
-      setNotes("");
+      setDietAdvice("");
     } catch {
-      onError("Failed to dispatch prescription record. Please try again.");
+      onError("Failed to submit clinical consultation to the database.");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handlePrescriptionSubmit} className="space-y-6 text-slate-800">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 gap-2">
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
         <div>
-          <h2 className="text-base sm:text-lg font-black text-slate-900 uppercase tracking-tight">
-            Physician Clinical Chart Console
+          <h2 className="text-lg font-black text-slate-900 tracking-tight">
+            PHYSICIAN CLINICAL CHART CONSOLE
           </h2>
-          <p className="text-xs text-slate-500 font-medium">
-            Attending Physician: <strong className="text-teal-700 font-bold">{doctorName}</strong> • Gavane Hospital EHR
+          <p className="text-xs text-slate-500">
+            Attending Physician: <strong className="text-teal-700">{doctorName}</strong> • Gavane Hospital EHR
           </p>
         </div>
-        <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 self-start sm:self-auto">
-          ● DPDP Act 2023 Compliant Node
+        <span className="text-[10px] font-extrabold uppercase tracking-wider bg-teal-50 text-teal-800 border border-teal-200 px-2.5 py-1 rounded-full">
+          DPDP ACT 2023 COMPLIANT NODE
         </span>
       </div>
 
-      {/* 1. Patient Selector */}
-      <div className="space-y-1">
-        <label className="block text-[11px] font-bold text-slate-700 uppercase">
+      {/* 1. Patient Picker */}
+      <div>
+        <label className="block text-[10px] font-extrabold uppercase text-slate-700 tracking-wider mb-1.5">
           1. Select Registered Patient Record *
         </label>
         <select
+          required
           value={selectedPatientId}
           onChange={(e) => setSelectedPatientId(e.target.value)}
-          required
-          className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
+          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-teal-600 focus:outline-none"
         >
-          <option value="">-- Choose Registered Patient ({patients.length} available) --</option>
+          <option value="">
+            -- Choose Registered Patient ({patients.length} available in your caseload) --
+          </option>
           {patients.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.full_name} ({p.phone}) [{p.department}] • Assigned: {p.assigned_doctor}
+              {p.full_name} • {p.phone} • Ref: {p.reference_id} ({p.notes})
             </option>
           ))}
         </select>
-        {selectedPatient && (
-          <div className="p-2.5 bg-teal-50/70 border border-teal-200/80 rounded-xl text-xs flex flex-wrap items-center justify-between text-teal-900 gap-2 mt-2">
-            <div>
-              Ref: <strong className="font-mono">{selectedPatient.reference_id}</strong> • Vitals: {selectedPatient.notes || "Standard Triage Cleared"}
-            </div>
-            <span className="text-[10px] font-bold uppercase bg-white px-2 py-0.5 rounded border border-teal-300">
-              Active Triage
-            </span>
-          </div>
-        )}
       </div>
 
-      {/* 2. Clinical Diagnosis */}
-      <div className="space-y-1">
-        <label className="block text-[11px] font-bold text-slate-700 uppercase">
+      {/* 2. Clinical Assessment */}
+      <div>
+        <label className="block text-[10px] font-extrabold uppercase text-slate-700 tracking-wider mb-1.5">
           2. Clinical Assessment & Diagnosis *
         </label>
         <textarea
-          rows={3}
           required
-          value={diagnosis}
-          onChange={(e) => setDiagnosis(e.target.value)}
+          rows={3}
+          value={clinicalAssessment}
+          onChange={(e) => setClinicalAssessment(e.target.value)}
           placeholder="Enter clinical examination notes, observed vitals (BP, Pulse, SpO2), symptoms, and primary diagnosis..."
-          className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none resize-none"
+          className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-teal-600 focus:outline-none"
         />
       </div>
 
-      {/* 3. Diagnostic Investigations */}
-      <div className="space-y-2">
-        <label className="block text-[11px] font-bold text-slate-700 uppercase">
+      {/* 3. Diagnostic Tests */}
+      <div>
+        <label className="block text-[10px] font-extrabold uppercase text-slate-700 tracking-wider mb-1.5">
           3. Diagnostic Investigations (Suggested Lab Tests)
         </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-          {COMMON_INVESTIGATIONS.map((test, i) => {
-            const isChecked = selectedTests.includes(test);
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {COMMON_INVESTIGATIONS.map((test) => {
+            const checked = selectedTests.includes(test);
             return (
               <label
-                key={i}
-                className={`flex items-center space-x-2.5 p-2.5 rounded-xl border text-xs font-medium cursor-pointer transition-all ${
-                  isChecked
-                    ? "bg-teal-50 border-teal-400 text-teal-900 font-bold"
-                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                key={test}
+                className={`flex items-center space-x-2 p-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                  checked
+                    ? "bg-teal-50 border-teal-500 text-teal-900 shadow-xs"
+                    : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
                 }`}
               >
                 <input
                   type="checkbox"
-                  checked={isChecked}
-                  onChange={() => handleTestToggle(test)}
+                  checked={checked}
+                  onChange={() => toggleTest(test)}
                   className="rounded text-teal-600 focus:ring-teal-500 w-3.5 h-3.5"
                 />
                 <span className="truncate">{test}</span>
@@ -183,42 +178,42 @@ export default function DoctorClinicalForm({
         </div>
       </div>
 
-      {/* 4. Pharmacological Prescriptions */}
-      <div className="space-y-1">
-        <label className="block text-[11px] font-bold text-slate-700 uppercase">
-          4. Pharmacological Prescriptions (Medications, Dosage, Regimen)
+      {/* 4. Medications */}
+      <div>
+        <label className="block text-[10px] font-extrabold uppercase text-slate-700 tracking-wider mb-1.5">
+          4. Pharmacological Prescriptions (Medications, Dosage, Regimen) *
         </label>
         <textarea
+          required
           rows={3}
           value={medications}
           onChange={(e) => setMedications(e.target.value)}
-          placeholder="e.g.&#10;1. Tab. Paracetamol 650mg — 1-0-1 (After meals) — 5 Days&#10;2. Tab. Pantoprazole 40mg — 1-0-0 (Empty stomach) — 5 Days"
-          className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs font-mono focus:ring-2 focus:ring-teal-600 focus:outline-none resize-none"
+          placeholder="e.g. 1. Tab. Paracetamol 650mg — 1-0-1 (After meals) — 5 Days&#10;2. Tab. Pantoprazole 40mg — 1-0-0 (Empty stomach) — 5 Days"
+          className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-teal-600 focus:outline-none font-mono"
         />
       </div>
 
-      {/* 5. Doctor Advice & Dietary Advice */}
-      <div className="space-y-1">
-        <label className="block text-[11px] font-bold text-slate-700 uppercase">
+      {/* 5. Dietary & Follow-up */}
+      <div>
+        <label className="block text-[10px] font-extrabold uppercase text-slate-700 tracking-wider mb-1.5">
           5. Dietary Guidelines & Follow-Up Advice
         </label>
-        <input
-          type="text"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="e.g. Low sodium diet. Drink 3L water. Review with reports in 3 days."
-          className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+        <textarea
+          rows={2}
+          value={dietAdvice}
+          onChange={(e) => setDietAdvice(e.target.value)}
+          placeholder="e.g. Low sodium diet. Drink 3L water daily. Review with diagnostic reports in 3 days."
+          className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-teal-600 focus:outline-none"
         />
       </div>
 
-      {/* Submit Action */}
-      <div className="pt-2 flex justify-end">
+      <div className="flex justify-end pt-2">
         <button
           type="submit"
           disabled={submitting}
-          className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center space-x-2"
+          className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white text-xs font-extrabold uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center space-x-2"
         >
-          <span>{submitting ? "Transmitting..." : "✓ Generate E-Prescription & Commit Record"}</span>
+          <span>{submitting ? "Transmitting..." : "Sign & Transmit Consultation to Pharmacy"}</span>
         </button>
       </div>
     </form>

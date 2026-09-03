@@ -1,3 +1,5 @@
+import { supabase } from "@/lib/supabase";
+
 export interface SharedDoctor {
   id: string;
   reference_id: string;
@@ -23,105 +25,76 @@ export function generateDoctorSlug(name: string): string {
   return `doctor-${cleanName}`;
 }
 
-export const INITIAL_DOCTORS: SharedDoctor[] = [
-  {
-    id: "doc-1",
-    reference_id: "GH-2026-001",
-    name: "Dr. Ananya Rao",
-    slug: "doctor-ananya-rao",
-    degree: "MBBS, MD (Cardiology), FACC",
-    department: "Cardiology & Cardiac Sciences",
-    email: "ananya@gavanehospital.in",
-    password: "password123",
-    fee: "₹500",
-    image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80",
-    status: "Active",
-    created_at: "27/08/2026",
-  },
-  {
-    id: "doc-2",
-    reference_id: "GH-2026-002",
-    name: "Dr. Sudhir Gavane",
-    slug: "doctor-sudhir-gavane",
-    degree: "MS (General & Laparoscopic Surgery), M.Ch",
-    department: "General Surgery & Trauma",
-    email: "sudhir@gavanehospital.in",
-    password: "Password@123",
-    fee: "₹600",
-    image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
-    status: "Active",
-    created_at: "27/08/2026",
-  },
-  {
-    id: "doc-3",
-    reference_id: "GH-2026-003",
-    name: "Dr. Priya",
-    slug: "doctor-priya",
-    degree: "MD (Internal Medicine & Pediatrics)",
-    department: "General Medicine & Pediatrics",
-    email: "priya@gavanehospital.in",
-    password: "password123",
-    fee: "₹500",
-    image: "https://images.unsplash.com/photo-1594824813629-9e8c45f448ea?auto=format&fit=crop&w=600&q=80",
-    status: "Active",
-    created_at: "27/08/2026",
-  },
-];
-
-const STORAGE_KEY = "gavane_shared_doctors_master_v6";
-const DOCTOR_SESSION_KEY = "gavane_current_active_doctor_session_v6";
-
+// 1. Fetch live doctors from Supabase
 export async function getSharedDoctors(): Promise<SharedDoctor[]> {
-  if (typeof window === "undefined") return INITIAL_DOCTORS;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    let parsed: SharedDoctor[] = raw ? JSON.parse(raw) : INITIAL_DOCTORS;
+    const { data, error } = await supabase
+      .from("doctors")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-    parsed = parsed.map((doc) => {
-      let slug = doc.slug;
-      if (!slug || slug === "doctor") {
-        slug = generateDoctorSlug(doc.name);
+    if (error || !data || data.length === 0) {
+      // Fallback to cache if offline
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem("gavane_live_doctors_cache");
+        return cached ? JSON.parse(cached) : [];
       }
-      return { ...doc, slug };
-    });
+      return [];
+    }
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-    return parsed;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("gavane_live_doctors_cache", JSON.stringify(data));
+    }
+    return data as SharedDoctor[];
+  } catch (err) {
+    console.error("Error fetching doctors:", err);
+    return [];
+  }
+}
+
+// 2. Add or Update Doctor directly in Supabase
+export async function saveSharedDoctor(doctor: Partial<SharedDoctor>): Promise<SharedDoctor | null> {
+  try {
+    const slug = doctor.slug || (doctor.name ? generateDoctorSlug(doctor.name) : undefined);
+    const payload = {
+      ...doctor,
+      slug,
+    };
+
+    const { data, error } = await supabase
+      .from("doctors")
+      .upsert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error saving doctor:", error);
+      return null;
+    }
+
+    // Refresh local cache
+    await getSharedDoctors();
+    return data as SharedDoctor;
+  } catch (err) {
+    console.error("Error saving doctor:", err);
+    return null;
+  }
+}
+
+// 3. Delete Doctor directly from Supabase
+export async function deleteSharedDoctor(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.from("doctors").delete().eq("id", id);
+    if (error) return false;
+    await getSharedDoctors();
+    return true;
   } catch {
-    return INITIAL_DOCTORS;
+    return false;
   }
 }
 
-export async function saveSharedDoctor(doctor: SharedDoctor): Promise<SharedDoctor[]> {
-  const current = await getSharedDoctors();
-  const slug = doctor.slug && doctor.slug !== "doctor"
-    ? doctor.slug
-    : generateDoctorSlug(doctor.name);
-  const normalizedDoc: SharedDoctor = { ...doctor, slug };
-
-  const index = current.findIndex((d) => d.id === doctor.id);
-  let updated: SharedDoctor[];
-  if (index >= 0) {
-    updated = [...current];
-    updated[index] = normalizedDoc;
-  } else {
-    updated = [normalizedDoc, ...current];
-  }
-
-  if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  }
-  return updated;
-}
-
-export async function deleteSharedDoctor(id: string): Promise<SharedDoctor[]> {
-  const current = await getSharedDoctors();
-  const updated = current.filter((d) => d.id !== id);
-  if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  }
-  return updated;
-}
+// 4. Session Persistence for Active Doctor
+const DOCTOR_SESSION_KEY = "gavane_current_active_doctor_session";
 
 export function getCurrentDoctorSession(): SharedDoctor | null {
   if (typeof window === "undefined") return null;
@@ -142,29 +115,15 @@ export function setCurrentDoctorSession(doctor: SharedDoctor | null) {
   }
 }
 
+// 5. Generic Database Slug Lookup
 export function findDoctorBySlug(doctors: SharedDoctor[], rawSlug: string): SharedDoctor | undefined {
   if (!rawSlug) return undefined;
   const needle = rawSlug.toLowerCase().trim().replace(/^\/+/g, "").replace(/^dashboard\//, "");
 
-  // 1. Exact slug match
-  const direct = doctors.find((d) => d.slug.toLowerCase() === needle);
-  if (direct) return direct;
-
-  // 2. Exact ID match
-  const idMatch = doctors.find((d) => d.id.toLowerCase() === needle);
-  if (idMatch) return idMatch;
-
-  // 3. Name/Keyword matching for edge cases
-  if (needle.includes("sudhir")) {
-    return doctors.find((d) => d.email.includes("sudhir") || d.name.toLowerCase().includes("sudhir"));
-  }
-  if (needle.includes("ananya")) {
-    return doctors.find((d) => d.email.includes("ananya") || d.name.toLowerCase().includes("ananya"));
-  }
-  if (needle.includes("priya")) {
-    return doctors.find((d) => d.email.includes("priya") || d.name.toLowerCase().includes("priya"));
-  }
-
-  // 4. Clean calculated slug match
-  return doctors.find((d) => generateDoctorSlug(d.name) === needle);
+  return doctors.find(
+    (d) =>
+      d.slug.toLowerCase() === needle ||
+      d.id.toLowerCase() === needle ||
+      generateDoctorSlug(d.name) === needle
+  );
 }

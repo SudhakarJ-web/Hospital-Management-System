@@ -4,53 +4,29 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { 
-  getSharedDoctors, 
-  setCurrentDoctorSession, 
-  generateDoctorSlug, 
-  SharedDoctor 
-} from "@/lib/sync/doctorsSync";
+import { setCurrentDoctorSession, generateDoctorSlug, SharedDoctor } from "@/lib/sync/doctorsSync";
 
 type StaffRole = "Admin" | "Doctor" | "Support" | "Medical";
-
-interface StoredStaff {
-  id: string;
-  name: string;
-  email: string;
-  username?: string;
-  password?: string;
-  module_category: string;
-  status: "Active" | "Pending" | "Suspended";
-}
-
-const ROLE_PRESETS: Record<StaffRole, { email: string; pass: string }> = {
-  Admin: { email: "admin@gavanehospital.in", pass: "Admin@2026" },
-  Doctor: { email: "ananya@gavanehospital.in", pass: "password123" },
-  Support: { email: "support@gavanehospital.in", pass: "Support@2026" },
-  Medical: { email: "medical@gavanehospital.in", pass: "Medical@2026" },
-};
 
 export default function Navbar() {
   const router = useRouter();
 
-  // Mobile Navigation Drawer State
+  // Navigation & Modal States
   const [mobileNavOpen, setMobileNavOpen] = useState<boolean>(false);
-
-  // Modal States
   const [showStaffModal, setShowStaffModal] = useState<boolean>(false);
   const [showPatientModal, setShowPatientModal] = useState<boolean>(false);
   const [patientMode, setPatientMode] = useState<"login" | "register">("login");
 
   // Staff Form State
   const [selectedStaffRole, setSelectedStaffRole] = useState<StaffRole>("Doctor");
-  const [staffIdentifier, setStaffIdentifier] = useState<string>(ROLE_PRESETS.Doctor.email);
-  const [staffPassword, setStaffPassword] = useState<string>(ROLE_PRESETS.Doctor.pass);
+  const [staffIdentifier, setStaffIdentifier] = useState<string>("");
+  const [staffPassword, setStaffPassword] = useState<string>("");
   const [staffLoading, setStaffLoading] = useState<boolean>(false);
   const [staffError, setStaffError] = useState<string | null>(null);
 
   // Patient Form State
-  const [patientEmail, setPatientEmail] = useState<string>("patient@gavanehospital.in");
-  const [patientPassword, setPatientPassword] = useState<string>("Patient@2026");
+  const [patientEmail, setPatientEmail] = useState<string>("");
+  const [patientPassword, setPatientPassword] = useState<string>("");
   const [patientFullName, setPatientFullName] = useState<string>("");
   const [patientPhone, setPatientPhone] = useState<string>("");
   const [patientAbha, setPatientAbha] = useState<string>("");
@@ -60,8 +36,8 @@ export default function Navbar() {
 
   const handleRoleSelection = (role: StaffRole) => {
     setSelectedStaffRole(role);
-    setStaffIdentifier(ROLE_PRESETS[role].email);
-    setStaffPassword(ROLE_PRESETS[role].pass);
+    setStaffIdentifier("");
+    setStaffPassword("");
     setStaffError(null);
   };
 
@@ -73,63 +49,71 @@ export default function Navbar() {
     const inputId = staffIdentifier.trim().toLowerCase();
     const inputPass = staffPassword.trim();
 
-    // 1. DYNAMIC DOCTOR RESOLUTION & AUTHENTICATION
-    if (selectedStaffRole === "Doctor" || inputId.includes("doctor") || inputId.includes("ananya") || inputId.includes("sudhir") || inputId.includes("priya")) {
-      const allDoctors = await getSharedDoctors();
-      
-      let matchedDoctor = allDoctors.find(
-        (d) => d.email.trim().toLowerCase() === inputId || 
-               d.name.toLowerCase().includes(inputId) ||
-               (d.slug && inputId.includes(d.slug.replace("doctor-", "")))
-      );
+    // 1. PURE DATABASE AUTHENTICATION FOR DOCTORS
+    if (selectedStaffRole === "Doctor") {
+      try {
+        const { data: matchedDoctor, error } = await supabase
+          .from("doctors")
+          .select("*")
+          .ilike("email", inputId)
+          .maybeSingle();
 
-      // Fallback matching by keyword if local storage was slightly altered
-      if (!matchedDoctor) {
-        if (inputId.includes("sudhir")) {
-          matchedDoctor = allDoctors.find((d) => d.name.toLowerCase().includes("sudhir"));
-        } else if (inputId.includes("ananya")) {
-          matchedDoctor = allDoctors.find((d) => d.name.toLowerCase().includes("ananya"));
-        } else if (inputId.includes("priya")) {
-          matchedDoctor = allDoctors.find((d) => d.name.toLowerCase().includes("priya"));
+        if (error || !matchedDoctor) {
+          setStaffError("No registered doctor profile found with this email.");
+          setStaffLoading(false);
+          return;
         }
-      }
 
-      if (matchedDoctor) {
-        const validPassword = matchedDoctor.password || "password123";
-        if (inputPass !== validPassword && inputPass !== "Doctor@2026" && inputPass !== "Password@123") {
+        if (matchedDoctor.status === "Pending") {
+          setStaffError("Account approval is pending with the Hospital Administrator.");
+          setStaffLoading(false);
+          return;
+        }
+
+        if (matchedDoctor.status === "Suspended") {
+          setStaffError("Account suspended. Please consult Hospital Administration.");
+          setStaffLoading(false);
+          return;
+        }
+
+        // Validate directly against the live database password
+        if (matchedDoctor.password !== inputPass) {
           setStaffError("Incorrect password. Please verify credentials.");
           setStaffLoading(false);
           return;
         }
 
-        // Establish the Doctor Session
-        setCurrentDoctorSession(matchedDoctor);
+        // Establish session and route directly to the database slug
+        setCurrentDoctorSession(matchedDoctor as SharedDoctor);
         setShowStaffModal(false);
         setStaffLoading(false);
 
-        // Redirect directly to the doctor's specific personal slug
         const targetSlug = matchedDoctor.slug || generateDoctorSlug(matchedDoctor.name);
         window.location.href = `/dashboard/${targetSlug}`;
+        return;
+      } catch {
+        setStaffError("Database authentication unavailable. Please check connectivity.");
+        setStaffLoading(false);
         return;
       }
     }
 
     // 2. ADMIN ROLE
-    if (selectedStaffRole === "Admin" || inputId.includes("admin")) {
-      if (inputPass === "Admin@2026" || inputPass === "password123") {
+    if (selectedStaffRole === "Admin") {
+      if (inputId === "admin@gavanehospital.in" && (inputPass === "Admin@2026" || inputPass === "password123")) {
         setShowStaffModal(false);
         setStaffLoading(false);
         window.location.href = "/dashboard/admin";
         return;
       }
-      setStaffError("Invalid Admin credentials.");
+      setStaffError("Invalid Administrator credentials.");
       setStaffLoading(false);
       return;
     }
 
     // 3. SUPPORT ROLE
-    if (selectedStaffRole === "Support" || inputId.includes("support")) {
-      if (inputPass === "Support@2026" || inputPass === "password123") {
+    if (selectedStaffRole === "Support") {
+      if (inputId.includes("support") && (inputPass === "Support@2026" || inputPass === "password123")) {
         setShowStaffModal(false);
         setStaffLoading(false);
         window.location.href = "/dashboard/support";
@@ -141,8 +125,8 @@ export default function Navbar() {
     }
 
     // 4. MEDICAL ROLE
-    if (selectedStaffRole === "Medical" || inputId.includes("medical")) {
-      if (inputPass === "Medical@2026" || inputPass === "password123") {
+    if (selectedStaffRole === "Medical") {
+      if (inputId.includes("medical") && (inputPass === "Medical@2026" || inputPass === "password123")) {
         setShowStaffModal(false);
         setStaffLoading(false);
         window.location.href = "/dashboard/medical";
@@ -152,30 +136,6 @@ export default function Navbar() {
       setStaffLoading(false);
       return;
     }
-
-    // 5. SUPABASE AUTHENTICATION FALLBACK
-    try {
-      const { data } = await supabase.auth.signInWithPassword({
-        email: inputId,
-        password: inputPass,
-      });
-
-      if (data?.user) {
-        const metaRole = (data.user.user_metadata?.role || selectedStaffRole).toLowerCase();
-        setShowStaffModal(false);
-        setStaffLoading(false);
-        if (metaRole.includes("admin")) window.location.href = "/dashboard/admin";
-        else if (metaRole.includes("support")) window.location.href = "/dashboard/support";
-        else if (metaRole.includes("medical")) window.location.href = "/dashboard/medical";
-        else window.location.href = "/dashboard/doctor-ananya-rao";
-        return;
-      }
-    } catch {
-      // Ignore and report failure
-    }
-
-    setStaffError("Invalid credentials. Please verify your email and password.");
-    setStaffLoading(false);
   };
 
   const handlePatientAuth = async (e: React.FormEvent) => {
@@ -232,7 +192,7 @@ export default function Navbar() {
           ]);
         }
 
-        setPatientSuccess("Account created! Please sign in.");
+        setPatientSuccess("Account registered! You can now sign in.");
         setPatientMode("login");
         setPatientLoading(false);
       }
@@ -267,7 +227,7 @@ export default function Navbar() {
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex justify-between h-14 sm:h-16 items-center gap-1.5">
-            {/* Logo & Name */}
+            {/* Brand */}
             <Link href="/" className="flex items-center space-x-2 sm:space-x-3 shrink-0 min-w-0">
               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-teal-600 flex items-center justify-center text-white font-bold shadow-md shrink-0">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -292,9 +252,8 @@ export default function Navbar() {
               <Link href="/contact" className="hover:text-teal-600 transition-colors">Contact</Link>
             </div>
 
-            {/* Right Action Portal Buttons & Mobile Hamburger */}
+            {/* Portal Action Buttons */}
             <div className="flex items-center space-x-1.5 sm:space-x-2.5 shrink-0">
-              {/* Staff Portal Button */}
               <button
                 type="button"
                 onClick={() => {
@@ -307,7 +266,6 @@ export default function Navbar() {
                 <span className="whitespace-nowrap">Staff</span>
               </button>
 
-              {/* Patient Portal Button */}
               <button
                 type="button"
                 onClick={() => {
@@ -320,7 +278,7 @@ export default function Navbar() {
                 <span className="whitespace-nowrap">Patient</span>
               </button>
 
-              {/* Mobile Hamburger Toggle */}
+              {/* Mobile Menu Toggle */}
               <button
                 type="button"
                 onClick={() => setMobileNavOpen((prev) => !prev)}
@@ -339,37 +297,13 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Mobile Navigation Drawer */}
+        {/* Mobile Nav Drawer */}
         {mobileNavOpen && (
           <div className="lg:hidden border-t border-slate-200 bg-slate-50 px-4 py-3 space-y-2 animate-in slide-in-from-top duration-150">
-            <Link
-              href="/"
-              onClick={() => setMobileNavOpen(false)}
-              className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1"
-            >
-              Home
-            </Link>
-            <Link
-              href="/about"
-              onClick={() => setMobileNavOpen(false)}
-              className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1"
-            >
-              About Us
-            </Link>
-            <Link
-              href="/#facilities"
-              onClick={() => setMobileNavOpen(false)}
-              className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1"
-            >
-              Facilities
-            </Link>
-            <Link
-              href="/contact"
-              onClick={() => setMobileNavOpen(false)}
-              className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1"
-            >
-              Contact
-            </Link>
+            <Link href="/" onClick={() => setMobileNavOpen(false)} className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1">Home</Link>
+            <Link href="/about" onClick={() => setMobileNavOpen(false)} className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1">About Us</Link>
+            <Link href="/#facilities" onClick={() => setMobileNavOpen(false)} className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1">Facilities</Link>
+            <Link href="/contact" onClick={() => setMobileNavOpen(false)} className="block text-xs font-bold uppercase tracking-wider text-slate-700 hover:text-teal-600 py-1">Contact</Link>
           </div>
         )}
       </nav>
@@ -394,7 +328,7 @@ export default function Navbar() {
               <p className="text-[11px] text-slate-500">Gavane Hospital Enterprise Network</p>
             </div>
 
-            {/* 4-Role Tab Grid */}
+            {/* Role Tabs */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               {[
                 { id: "Admin", label: "Admin", icon: "🔑" },
@@ -430,12 +364,12 @@ export default function Navbar() {
             <form onSubmit={handleStaffLogin} className="space-y-3">
               <div>
                 <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                  Registered {selectedStaffRole} Email / Username
+                  Registered {selectedStaffRole} Email
                 </label>
                 <input
-                  type="text"
+                  type="email"
                   required
-                  placeholder={`Enter ${selectedStaffRole} email or username...`}
+                  placeholder={`Enter your ${selectedStaffRole.toLowerCase()} email...`}
                   value={staffIdentifier}
                   onChange={(e) => setStaffIdentifier(e.target.value)}
                   className="w-full bg-white border border-slate-300 text-slate-900 text-xs rounded-lg p-2.5 focus:ring-2 focus:ring-teal-600 font-medium"

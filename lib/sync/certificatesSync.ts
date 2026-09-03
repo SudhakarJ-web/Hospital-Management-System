@@ -1,64 +1,74 @@
+import { supabase } from "@/lib/supabase";
+
 export interface SharedCertificate {
   id: string;
-  reference_id: string;
-  certificate_title: string;
+  certificate_id: string;
   patient_name: string;
-  purpose: string;
-  issued_date: string;
-  authorizing_doctor: string;
-  status: "Active" | "Pending" | "Completed" | "Suspended";
+  patient_age: string;
+  patient_gender: string;
+  doctor_name: string;
+  doctor_id?: string;
+  diagnosis: string;
+  recommended_leave: string;
+  issue_date: string;
+  remarks?: string;
   created_at: string;
 }
 
-const INITIAL_CERTIFICATES: SharedCertificate[] = [
-  {
-    id: "cert-1",
-    reference_id: "GH-2026-CERT01",
-    certificate_title: "Medical Fitness Certificate",
-    patient_name: "Mayur Jadhav",
-    purpose: "Pre-Employment Fitness Assessment",
-    issued_date: "28/08/2026",
-    authorizing_doctor: "Dr. Sudhir Gavane",
-    status: "Active",
-    created_at: "28/08/2026",
-  },
-];
-
-const STORAGE_KEY = "gavane_shared_certificates";
-
 export async function getSharedCertificates(): Promise<SharedCertificate[]> {
-  if (typeof window === "undefined") return INITIAL_CERTIFICATES;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : INITIAL_CERTIFICATES;
-  } catch {
-    return INITIAL_CERTIFICATES;
+    const { data, error } = await supabase
+      .from("medical_certificates")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error || !data) {
+      console.error("Error fetching certificates:", error);
+      return [];
+    }
+
+    return data as SharedCertificate[];
+  } catch (err) {
+    console.error("Failed to query certificates:", err);
+    return [];
   }
 }
 
-export async function saveSharedCertificate(cert: SharedCertificate): Promise<SharedCertificate[]> {
-  const current = await getSharedCertificates();
-  const existsIndex = current.findIndex((c) => c.id === cert.id);
+export async function saveSharedCertificate(cert: Partial<SharedCertificate>): Promise<SharedCertificate[]> {
+  try {
+    const isNew = !cert.id || cert.id.startsWith("cert-");
+    const payload = {
+      certificate_id: cert.certificate_id || `GH-MED-${Date.now().toString().slice(-6)}`,
+      patient_name: cert.patient_name,
+      patient_age: cert.patient_age || "30",
+      patient_gender: cert.patient_gender || "Not specified",
+      doctor_name: cert.doctor_name,
+      doctor_id: cert.doctor_id || null,
+      diagnosis: cert.diagnosis,
+      recommended_leave: cert.recommended_leave,
+      issue_date: cert.issue_date || new Date().toISOString().split("T")[0],
+      remarks: cert.remarks || "",
+    };
 
-  let updated: SharedCertificate[];
-  if (existsIndex >= 0) {
-    updated = [...current];
-    updated[existsIndex] = cert;
-  } else {
-    updated = [cert, ...current];
-  }
+    if (isNew) {
+      await supabase.from("medical_certificates").insert([payload]);
+    } else {
+      await supabase.from("medical_certificates").update(payload).eq("id", cert.id);
+    }
 
-  if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    return await getSharedCertificates();
+  } catch (err) {
+    console.error("Failed to save certificate:", err);
+    return await getSharedCertificates();
   }
-  return updated;
 }
 
 export async function deleteSharedCertificate(id: string): Promise<SharedCertificate[]> {
-  const current = await getSharedCertificates();
-  const updated = current.filter((c) => c.id !== id);
-  if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  try {
+    await supabase.from("medical_certificates").delete().eq("id", id);
+    return await getSharedCertificates();
+  } catch (err) {
+    console.error("Failed to delete certificate:", err);
+    return await getSharedCertificates();
   }
-  return updated;
 }

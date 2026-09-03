@@ -1,3 +1,5 @@
+import { supabase } from "@/lib/supabase";
+
 export interface SharedPatient {
   id: string;
   reference_id: string;
@@ -5,71 +7,65 @@ export interface SharedPatient {
   phone: string;
   department: string;
   assigned_doctor: string;
+  doctor_id?: string;
   notes: string;
-  status: "Active" | "Pending" | "Completed" | "Suspended";
+  status: "Active" | "Discharged" | "Transferred";
   created_at: string;
 }
 
-const INITIAL_PATIENTS: SharedPatient[] = [
-  {
-    id: "pat-1",
-    reference_id: "GH-2026-REG101",
-    full_name: "Ramesh Kulkarni",
-    phone: "+91 98220 12345",
-    department: "General Medicine",
-    assigned_doctor: "Dr. Ananya Rao",
-    notes: "Triage Cleared • BP: 120/80",
-    status: "Active",
-    created_at: "Today 09:30 AM",
-  },
-  {
-    id: "pat-2",
-    reference_id: "GH-2026-REG102",
-    full_name: "Sagar Jadhav",
-    phone: "+91 91567 88990",
-    department: "Cardiology Dept",
-    assigned_doctor: "Dr. Priya",
-    notes: "Routine follow-up for ECG evaluation",
-    status: "Active",
-    created_at: "Today 10:15 AM",
-  },
-];
-
-const STORAGE_KEY = "gavane_shared_patients";
-
 export async function getSharedPatients(): Promise<SharedPatient[]> {
-  if (typeof window === "undefined") return INITIAL_PATIENTS;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : INITIAL_PATIENTS;
-  } catch {
-    return INITIAL_PATIENTS;
+    const { data, error } = await supabase
+      .from("patients")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error || !data) {
+      console.error("Error fetching patients from Supabase:", error);
+      return [];
+    }
+
+    return data as SharedPatient[];
+  } catch (err) {
+    console.error("Failed to query patients:", err);
+    return [];
   }
 }
 
-export async function saveSharedPatient(patient: SharedPatient): Promise<SharedPatient[]> {
-  const current = await getSharedPatients();
-  const existsIndex = current.findIndex((p) => p.id === patient.id);
+export async function saveSharedPatient(patient: Partial<SharedPatient>): Promise<SharedPatient[]> {
+  try {
+    const isNew = !patient.id || patient.id.startsWith("pat-");
+    const payload = {
+      reference_id: patient.reference_id || `GH-2026-REG${Math.floor(100 + Math.random() * 900)}`,
+      full_name: patient.full_name,
+      phone: patient.phone || "+91 98000 00000",
+      department: patient.department || "General Medicine",
+      assigned_doctor: patient.assigned_doctor || "Consultant Physician",
+      doctor_id: patient.doctor_id || null,
+      notes: patient.notes || "Routine triage",
+      status: patient.status || "Active",
+    };
 
-  let updated: SharedPatient[];
-  if (existsIndex >= 0) {
-    updated = [...current];
-    updated[existsIndex] = patient;
-  } else {
-    updated = [patient, ...current];
-  }
+    if (isNew) {
+      await supabase.from("patients").insert([payload]);
+    } else {
+      await supabase.from("patients").update(payload).eq("id", patient.id);
+    }
 
-  if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    return await getSharedPatients();
+  } catch (err) {
+    console.error("Failed to persist patient:", err);
+    return await getSharedPatients();
   }
-  return updated;
 }
 
 export async function deleteSharedPatient(id: string): Promise<SharedPatient[]> {
-  const current = await getSharedPatients();
-  const updated = current.filter((p) => p.id !== id);
-  if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  try {
+    const { error } = await supabase.from("patients").delete().eq("id", id);
+    if (error) throw error;
+    return await getSharedPatients();
+  } catch (err) {
+    console.error("Failed to delete patient:", err);
+    return await getSharedPatients();
   }
-  return updated;
 }
