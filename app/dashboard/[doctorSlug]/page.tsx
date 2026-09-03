@@ -74,10 +74,9 @@ export default function DynamicDoctorDashboard({
   const [regPhone, setRegPhone] = useState("");
   const [regVitals, setRegVitals] = useState("BP: 120/80 • Cleared for Consultation");
 
-  // Resolve Doctor & Enforce Authentication Guard
   useEffect(() => {
     async function resolveDoctor() {
-      // 1. If someone accesses generic /dashboard/doctor, redirect to their active session or home
+      // Direct redirect if requested path is literally "doctor"
       if (rawSlug === "doctor" || rawSlug === "doctor/") {
         const session = getCurrentDoctorSession();
         if (session) {
@@ -95,12 +94,18 @@ export default function DynamicDoctorDashboard({
       if (matched) {
         setActiveDoctor(matched);
         setCurrentDoctorSession(matched);
-        document.cookie = `gavane_active_doctor_slug=${matched.slug || generateDoctorSlug(matched.name)}; path=/; max-age=86400`;
         setIsInitializing(false);
-      } else {
-        // If the URL slug does not match any registered physician, reject and route back
-        window.location.replace("/");
+        return;
       }
+
+      // Check current session fallback if slug was not directly matched
+      const session = getCurrentDoctorSession();
+      if (session && session.slug) {
+        window.location.replace(`/dashboard/${session.slug}`);
+        return;
+      }
+
+      window.location.replace("/");
     }
 
     resolveDoctor();
@@ -122,7 +127,6 @@ export default function DynamicDoctorDashboard({
     loadData();
   }, [loadData]);
 
-  // Scoped Datasets per Doctor
   const doctorPatients = useMemo(() => {
     if (filterScope === "ALL") return patients;
     return patients.filter((p) => {
@@ -181,7 +185,6 @@ export default function DynamicDoctorDashboard({
 
   const handleLogout = () => {
     setCurrentDoctorSession(null);
-    document.cookie = "gavane_active_doctor_slug=; path=/; max-age=0";
     window.location.href = "/";
   };
 
@@ -267,7 +270,7 @@ export default function DynamicDoctorDashboard({
     return (
       <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center space-y-3">
         <div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs font-bold text-slate-500">Verifying authorized physician workspace...</p>
+        <p className="text-xs font-bold text-slate-500">Verifying physician console...</p>
       </div>
     );
   }
@@ -282,7 +285,6 @@ export default function DynamicDoctorDashboard({
         onClose={handleLogout}
       />
 
-      {/* Mobile Switch Bar */}
       <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-2 text-xs font-bold text-white truncate">
           <span className="text-teal-400">🩺 {doctorName}:</span>
@@ -297,7 +299,6 @@ export default function DynamicDoctorDashboard({
       </div>
 
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <DashboardSidebar
             modules={DOCTOR_SIDEBAR_MODULES}
@@ -310,7 +311,6 @@ export default function DynamicDoctorDashboard({
           />
         </div>
 
-        {/* Mobile Slide-Over Drawer */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 z-50 lg:hidden flex flex-col bg-slate-950/80 backdrop-blur-sm">
             <div className="w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-left duration-200">

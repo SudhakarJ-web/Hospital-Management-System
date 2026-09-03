@@ -1,10 +1,16 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { 
   Lock, Mail, Stethoscope, Users, Pill, KeyRound, AlertCircle, Key 
 } from "lucide-react";
-import { getSharedDoctors, setCurrentDoctorSession, generateDoctorSlug, SharedDoctor } from "@/lib/sync/doctorsSync";
+import { 
+  getSharedDoctors, 
+  setCurrentDoctorSession, 
+  generateDoctorSlug, 
+  SharedDoctor 
+} from "@/lib/sync/doctorsSync";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -14,6 +20,7 @@ interface AuthModalProps {
 type RoleType = "Admin" | "Doctor" | "Support" | "Medical";
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
+  const router = useRouter();
   const [activeRole, setActiveRole] = useState<RoleType>("Doctor");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("password123");
@@ -46,8 +53,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       setPassword("password123");
     } else if (role === "Doctor") {
       const first = availableDoctors[0];
-      setEmail(first?.email || "sudhir@gavanehospital.in");
-      setPassword(first?.password || "Password@123");
+      setEmail(first?.email || "ananya@gavanehospital.in");
+      setPassword(first?.password || "password123");
     } else if (role === "Support") {
       setEmail("support@gavanehospital.in");
       setPassword("password123");
@@ -90,27 +97,23 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
         const validPassword = matchedDoctor.password || "password123";
         if (inputPass !== validPassword) {
-          setErrorMsg("Incorrect password. Please verify your credentials.");
+          setErrorMsg("Incorrect password. Please check your credentials.");
           setLoading(false);
           return;
         }
 
-        // 1. Lock doctor session
         setCurrentDoctorSession(matchedDoctor);
         onClose();
 
-        // 2. Resolve destination slug
         const targetSlug = matchedDoctor.slug || generateDoctorSlug(matchedDoctor.name);
-        
-        // 3. Direct window relocation to explicit doctor route
-        window.location.replace(`/dashboard/${targetSlug}`);
+        window.location.href = `/dashboard/${targetSlug}`;
         return;
       }
 
       if (activeRole === "Admin") {
         if (inputEmail === "admin@gavanehospital.in" && inputPass === "password123") {
           onClose();
-          window.location.replace("/dashboard/admin");
+          window.location.href = "/dashboard/admin";
           return;
         } else {
           setErrorMsg("Invalid Admin credentials.");
@@ -122,7 +125,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       if (activeRole === "Support") {
         if (inputEmail.includes("support") && inputPass === "password123") {
           onClose();
-          window.location.replace("/dashboard/support");
+          window.location.href = "/dashboard/support";
           return;
         } else {
           setErrorMsg("Invalid Support Staff credentials.");
@@ -134,7 +137,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       if (activeRole === "Medical") {
         if (inputEmail.includes("medical") && inputPass === "password123") {
           onClose();
-          window.location.replace("/dashboard/medical");
+          window.location.href = "/dashboard/medical";
           return;
         } else {
           setErrorMsg("Invalid Pharmacy / Medical Officer credentials.");
@@ -194,7 +197,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           })}
         </div>
 
-        {/* Quick Pick Buttons for Registered Doctors */}
+        {/* Doctor Quick Selector */}
         {activeRole === "Doctor" && availableDoctors.length > 0 && (
           <div className="space-y-1.5">
             <label className="block text-[10px] font-bold text-slate-600 uppercase">
@@ -229,7 +232,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </div>
         )}
 
-        {/* Form Container with Enter Key Prevention */}
         <div className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
