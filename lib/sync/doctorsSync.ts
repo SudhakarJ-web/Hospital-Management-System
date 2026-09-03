@@ -68,8 +68,8 @@ export const INITIAL_DOCTORS: SharedDoctor[] = [
   },
 ];
 
-const STORAGE_KEY = "gavane_shared_doctors_master_v4";
-const DOCTOR_SESSION_KEY = "gavane_current_active_doctor_session";
+const STORAGE_KEY = "gavane_shared_doctors_master_v5";
+const DOCTOR_SESSION_KEY = "gavane_current_active_doctor_session_v5";
 
 export async function getSharedDoctors(): Promise<SharedDoctor[]> {
   if (typeof window === "undefined") return INITIAL_DOCTORS;
@@ -77,10 +77,16 @@ export async function getSharedDoctors(): Promise<SharedDoctor[]> {
     const raw = localStorage.getItem(STORAGE_KEY);
     let parsed: SharedDoctor[] = raw ? JSON.parse(raw) : INITIAL_DOCTORS;
 
-    parsed = parsed.map((doc) => ({
-      ...doc,
-      slug: doc.slug && doc.slug !== "doctor" ? doc.slug : generateDoctorSlug(doc.name),
-    }));
+    parsed = parsed.map((doc) => {
+      let s = doc.slug;
+      if (!s || s === "doctor") {
+        s = generateDoctorSlug(doc.name);
+      }
+      return {
+        ...doc,
+        slug: s,
+      };
+    });
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
     return parsed;
@@ -147,11 +153,15 @@ export function findDoctorBySlug(doctors: SharedDoctor[], rawSlug: string): Shar
   const direct = doctors.find((d) => d.slug.toLowerCase() === needle);
   if (direct) return direct;
 
-  // 2. Computed slug match
+  // 2. Direct ID match
+  const idMatch = doctors.find((d) => d.id.toLowerCase() === needle);
+  if (idMatch) return idMatch;
+
+  // 3. Computed slug match
   const comp = doctors.find((d) => generateDoctorSlug(d.name) === needle);
   if (comp) return comp;
 
-  // 3. Partial keyword match (e.g., "doctor-ananya" -> Dr. Ananya Rao)
+  // 4. Keyword / name matching
   const cleanNeedle = needle.replace(/^doctor-/, "");
   return doctors.find((d) => {
     const namePart = d.name.toLowerCase().replace(/^dr\.?\s*/i, "");

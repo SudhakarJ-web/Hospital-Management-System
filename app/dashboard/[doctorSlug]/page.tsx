@@ -83,22 +83,21 @@ export default function DynamicDoctorDashboard({
       const allDoctors = await getSharedDoctors();
       const session = getCurrentDoctorSession();
 
-      // INTERCEPT: If URL is /dashboard/doctor, forward immediately to the logged-in doctor's slug!
+      // Intercept accidental navigation to /dashboard/doctor
       if (rawSlug === "doctor" || rawSlug === "doctor/") {
-        if (session && session.slug && session.slug !== "doctor") {
-          window.location.replace(`/dashboard/${session.slug}`);
+        if (session && session.email) {
+          const matched = allDoctors.find(
+            (d) => d.email.toLowerCase() === session.email.toLowerCase()
+          ) || session;
+          const slug = matched.slug || generateDoctorSlug(matched.name);
+          window.location.replace(`/dashboard/${slug}`);
           return;
         }
-        if (session && session.name) {
-          window.location.replace(`/dashboard/${generateDoctorSlug(session.name)}`);
-          return;
-        }
-        // If no doctor session is active, route to Dr. Priya by default rather than getting stuck
-        window.location.replace("/dashboard/doctor-priya");
+        window.location.replace("/");
         return;
       }
 
-      // Match doctor directly by the URL slug (e.g., doctor-priya, doctor-sudhir-gavane, etc.)
+      // Match strictly by the URL slug
       const matched = findDoctorBySlug(allDoctors, rawSlug);
 
       if (!isMounted) return;
@@ -110,14 +109,17 @@ export default function DynamicDoctorDashboard({
         return;
       }
 
-      // If slug failed to match, check existing session
-      if (session) {
-        setActiveDoctor(session);
+      // If URL slug was not found, check for an existing session
+      if (session && session.email) {
+        const sessionDoc = allDoctors.find(
+          (d) => d.email.toLowerCase() === session.email.toLowerCase()
+        ) || session;
+        setActiveDoctor(sessionDoc);
         setIsInitializing(false);
         return;
       }
 
-      // Final fallback
+      // Fallback
       if (allDoctors.length > 0) {
         setActiveDoctor(allDoctors[0]);
         setCurrentDoctorSession(allDoctors[0]);

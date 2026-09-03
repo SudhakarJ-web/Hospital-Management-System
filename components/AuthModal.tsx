@@ -20,7 +20,7 @@ type RoleType = "Admin" | "Doctor" | "Support" | "Medical";
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [activeRole, setActiveRole] = useState<RoleType>("Doctor");
-  const [email, setEmail] = useState("priya@gavanehospital.in");
+  const [email, setEmail] = useState("ananya@gavanehospital.in");
   const [password, setPassword] = useState("password123");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -46,8 +46,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       setEmail("admin@gavanehospital.in");
       setPassword("password123");
     } else if (role === "Doctor") {
-      setEmail(availableDoctors[0]?.email || "priya@gavanehospital.in");
-      setPassword("password123");
+      setEmail(availableDoctors[0]?.email || "ananya@gavanehospital.in");
+      setPassword(availableDoctors[0]?.password || "password123");
     } else if (role === "Support") {
       setEmail("support@gavanehospital.in");
       setPassword("password123");
@@ -63,8 +63,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setErrorMsg(null);
   };
 
-  const executeLogin = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const executeLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
 
     if (!email.trim()) {
       setErrorMsg("Please enter your registered email address.");
@@ -80,56 +80,9 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     try {
       if (activeRole === "Doctor") {
         const doctors = await getSharedDoctors();
-        let matchedDoctor = doctors.find(
+        const matchedDoctor = doctors.find(
           (d) => d.email.trim().toLowerCase() === inputEmail
         );
-
-        // Fallback email matching if localStorage has stale doctor records
-        if (!matchedDoctor) {
-          if (inputEmail.includes("priya")) {
-            matchedDoctor = doctors.find((d) => d.name.toLowerCase().includes("priya")) || {
-              id: "doc-3",
-              reference_id: "GH-2026-003",
-              name: "Dr. Priya",
-              slug: "doctor-priya",
-              degree: "MD (Internal Medicine & Pediatrics)",
-              department: "General Medicine & Pediatrics",
-              email: "priya@gavanehospital.in",
-              fee: "₹500",
-              image: "https://images.unsplash.com/photo-1594824813629-9e8c45f448ea?auto=format&fit=crop&w=600&q=80",
-              status: "Active",
-              created_at: "27/08/2026",
-            };
-          } else if (inputEmail.includes("sudhir")) {
-            matchedDoctor = doctors.find((d) => d.name.toLowerCase().includes("sudhir")) || {
-              id: "doc-2",
-              reference_id: "GH-2026-002",
-              name: "Dr. Sudhir Gavane",
-              slug: "doctor-sudhir-gavane",
-              degree: "MS (General & Laparoscopic Surgery), M.Ch",
-              department: "General Surgery & Trauma",
-              email: "sudhir@gavanehospital.in",
-              fee: "₹600",
-              image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
-              status: "Active",
-              created_at: "27/08/2026",
-            };
-          } else if (inputEmail.includes("ananya")) {
-            matchedDoctor = doctors.find((d) => d.name.toLowerCase().includes("ananya")) || {
-              id: "doc-1",
-              reference_id: "GH-2026-001",
-              name: "Dr. Ananya Rao",
-              slug: "doctor-ananya-rao",
-              degree: "MBBS, MD (Cardiology), FACC",
-              department: "Cardiology & Cardiac Sciences",
-              email: "ananya@gavanehospital.in",
-              fee: "₹500",
-              image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80",
-              status: "Active",
-              created_at: "27/08/2026",
-            };
-          }
-        }
 
         if (!matchedDoctor) {
           setErrorMsg("No doctor profile registered with this email address.");
@@ -137,11 +90,16 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           return;
         }
 
-        // Establish session
+        const validPassword = matchedDoctor.password || "password123";
+        if (inputPass !== validPassword) {
+          setErrorMsg("Incorrect password. Please verify your credentials.");
+          setLoading(false);
+          return;
+        }
+
         setCurrentDoctorSession(matchedDoctor);
         onClose();
 
-        // Target URL format: strictly /dashboard/doctor-[name]
         const targetSlug = matchedDoctor.slug || generateDoctorSlug(matchedDoctor.name);
         window.location.href = `/dashboard/${targetSlug}`;
         return;
@@ -206,7 +164,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </div>
         </div>
 
-        {/* Role Tabs */}
         <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/80 text-[11px] font-bold">
           {[
             { id: "Admin", label: "Admin", icon: Key },
@@ -234,7 +191,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           })}
         </div>
 
-        {/* Doctor Quick Selector */}
         {activeRole === "Doctor" && availableDoctors.length > 0 && (
           <div className="space-y-1.5">
             <label className="block text-[10px] font-bold text-slate-600 uppercase">
@@ -269,7 +225,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </div>
         )}
 
-        {/* Login Form with Prevented Form Navigation */}
         <form onSubmit={executeLogin} className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
