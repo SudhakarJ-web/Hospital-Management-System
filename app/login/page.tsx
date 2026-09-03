@@ -2,169 +2,192 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { 
+  getSharedDoctors, 
+  setCurrentDoctorSession, 
+  generateDoctorSlug 
+} from "@/lib/sync/doctorsSync";
 
 type AppRole = "admin" | "doctor" | "support" | "medical" | "patient";
 
-const PRESET_CREDENTIALS: Record<AppRole, { email: string; pass: string; route: string }> = {
-  admin: { email: "admin@gavanehospital.in", pass: "Admin@2026", route: "/dashboard/admin" },
-  doctor: { email: "doctor@gavanehospital.in", pass: "Doctor@2026", route: "/dashboard/doctor" },
-  support: { email: "support@gavanehospital.in", pass: "Support@2026", route: "/dashboard/support" },
-  medical: { email: "medical@gavanehospital.in", pass: "Medical@2026", route: "/dashboard/medical" },
-  patient: { email: "patient@gavanehospital.in", pass: "Patient@2026", route: "/dashboard/patient" },
-};
-
 export default function LoginPage() {
   const router = useRouter();
-  const [selectedRole, setSelectedRole] = useState<AppRole>("admin");
-  const [email, setEmail] = useState<string>(PRESET_CREDENTIALS.admin.email);
-  const [password, setPassword] = useState<string>(PRESET_CREDENTIALS.admin.pass);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [selectedRole, setSelectedRole] = useState<AppRole>("doctor");
+  const [email, setEmail] = useState("sudhir@gavanehospital.in");
+  const [password, setPassword] = useState("Password@123");
+  const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleRoleTabClick = (role: AppRole) => {
     setSelectedRole(role);
-    setEmail(PRESET_CREDENTIALS[role].email);
-    setPassword(PRESET_CREDENTIALS[role].pass);
     setErrorMsg(null);
+    if (role === "admin") {
+      setEmail("admin@gavanehospital.in");
+      setPassword("password123");
+    } else if (role === "doctor") {
+      setEmail("sudhir@gavanehospital.in");
+      setPassword("Password@123");
+    } else if (role === "support") {
+      setEmail("support@gavanehospital.in");
+      setPassword("password123");
+    } else if (role === "medical") {
+      setEmail("medical@gavanehospital.in");
+      setPassword("password123");
+    } else if (role === "patient") {
+      setEmail("patient@gavanehospital.in");
+      setPassword("Patient@2026");
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
     setLoading(true);
+    setErrorMsg(null);
 
-    const targetRoute = PRESET_CREDENTIALS[selectedRole].route;
+    const inputEmail = email.trim().toLowerCase();
+    const inputPass = password.trim();
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-
-      if (error) {
-        // Fallback for demo credentials or offline development
-        const isKnownPreset = Object.values(PRESET_CREDENTIALS).some(
-          (c) => c.email.toLowerCase() === email.trim().toLowerCase()
+      if (selectedRole === "doctor") {
+        const doctors = await getSharedDoctors();
+        const matchedDoctor = doctors.find(
+          (d) => d.email.trim().toLowerCase() === inputEmail
         );
 
-        if (isKnownPreset) {
-          router.push(targetRoute);
+        if (!matchedDoctor) {
+          setErrorMsg("No doctor profile registered with this email address.");
+          setLoading(false);
           return;
         }
 
-        setErrorMsg(error.message);
+        const validPassword = matchedDoctor.password || "password123";
+        if (inputPass !== validPassword) {
+          setErrorMsg("Incorrect password. Please verify your credentials.");
+          setLoading(false);
+          return;
+        }
+
+        // Set session
+        setCurrentDoctorSession(matchedDoctor);
+
+        // Save active cookie for middleware resolution
+        const targetSlug = matchedDoctor.slug || generateDoctorSlug(matchedDoctor.name);
+        document.cookie = `gavane_active_doctor_slug=${targetSlug}; path=/; max-age=86400`;
+
+        // Direct navigation to dedicated doctor URL
+        window.location.replace(`/dashboard/${targetSlug}`);
+        return;
+      }
+
+      if (selectedRole === "admin") {
+        if (inputEmail === "admin@gavanehospital.in" && inputPass === "password123") {
+          window.location.replace("/dashboard/admin");
+          return;
+        }
+        setErrorMsg("Invalid Admin credentials.");
         setLoading(false);
         return;
       }
 
-      if (data?.user) {
-        const userMetaRole = (data.user.user_metadata?.role as AppRole) || selectedRole;
-        const matched = PRESET_CREDENTIALS[userMetaRole]?.route || targetRoute;
-        router.push(matched);
-      } else {
-        router.push(targetRoute);
+      if (selectedRole === "support") {
+        if (inputEmail.includes("support") && inputPass === "password123") {
+          window.location.replace("/dashboard/support");
+          return;
+        }
+        setErrorMsg("Invalid Support Staff credentials.");
+        setLoading(false);
+        return;
+      }
+
+      if (selectedRole === "medical") {
+        if (inputEmail.includes("medical") && inputPass === "password123") {
+          window.location.replace("/dashboard/medical");
+          return;
+        }
+        setErrorMsg("Invalid Pharmacy / Medical credentials.");
+        setLoading(false);
+        return;
+      }
+
+      if (selectedRole === "patient") {
+        window.location.replace("/dashboard/patient");
+        return;
       }
     } catch {
-      // Direct navigation fallback
-      router.push(targetRoute);
+      setErrorMsg("Authentication error. Please retry.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-4 sm:p-6 font-sans">
-      <div className="w-full max-w-md bg-slate-800 border border-slate-700 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
-        
-        {/* Brand Header */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400 mb-2">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+    <div className="min-h-screen bg-[#f0f4f8] flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-xl border border-slate-200 max-w-md w-full p-6 sm:p-8 space-y-6">
+        <div className="text-center">
+          <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-2xl border border-teal-200 flex items-center justify-center mx-auto mb-3 text-xl font-bold">
+            🩺
           </div>
-          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight uppercase">
-            Gavane Hospital
-          </h1>
-          <p className="text-xs text-slate-400 font-medium">
-            Role-Based Authentication & EHR Console Gateway
-          </p>
+          <h2 className="text-xl font-black text-slate-900 tracking-tight">Staff Portal Login</h2>
+          <p className="text-xs text-slate-500 mt-1">Gavane Hospital & Research Centre</p>
         </div>
 
-        {/* 5-Role Tab Selector */}
-        <div className="grid grid-cols-5 gap-1 bg-slate-900/80 p-1 rounded-xl border border-slate-700/80 text-[10px]">
-          {(["admin", "doctor", "support", "medical", "patient"] as const).map((role) => (
+        {/* Role Tabs */}
+        <div className="grid grid-cols-5 gap-1 p-1 bg-slate-100 rounded-xl text-[11px] font-bold">
+          {(["admin", "doctor", "support", "medical", "patient"] as AppRole[]).map((r) => (
             <button
-              key={role}
+              key={r}
               type="button"
-              onClick={() => handleRoleTabClick(role)}
-              className={`py-2 font-bold uppercase rounded-lg transition-all ${
-                selectedRole === role
-                  ? "bg-teal-600 text-white shadow-sm"
-                  : "text-slate-400 hover:text-white"
+              onClick={() => handleRoleTabClick(r)}
+              className={`py-1.5 rounded-lg capitalize transition-all cursor-pointer ${
+                selectedRole === r ? "bg-white text-teal-800 shadow-xs font-black" : "text-slate-500 hover:text-slate-800"
               }`}
             >
-              {role}
+              {r}
             </button>
           ))}
         </div>
 
-        {/* Error Alert */}
         {errorMsg && (
-          <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-medium text-center">
+          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl text-center">
             {errorMsg}
           </div>
         )}
 
-        {/* Form */}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-              Authorized Email
+            <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+              Registered {selectedRole} Email *
             </label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 font-medium transition-all"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-              Password
+            <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+              Password *
             </label>
             <input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 font-medium transition-all"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-teal-600 hover:bg-teal-500 disabled:bg-teal-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 mt-2"
+            className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer"
           >
-            {loading ? "Authenticating..." : `Access ${selectedRole} Console`}
+            {loading ? "Verifying..." : `Login as ${selectedRole}`}
           </button>
         </form>
-
-        {/* Helper Note */}
-        <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 text-[11px] text-slate-400 space-y-1">
-          <div className="text-teal-400 font-semibold uppercase text-[10px]">Default Credentials Loaded:</div>
-          <div>Email: <strong className="text-white">{email}</strong></div>
-          <div>Password: <strong className="text-white">{password}</strong></div>
-        </div>
-
-        <div className="border-t border-slate-700/60 pt-4 text-center">
-          <p className="text-[10px] text-slate-500">
-            Protected by 256-bit encryption • Strictly compliant with India DPDP Act 2023 & DISHA Guidelines
-          </p>
-        </div>
-
       </div>
     </div>
   );

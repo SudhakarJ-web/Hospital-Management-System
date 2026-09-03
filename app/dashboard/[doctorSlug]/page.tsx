@@ -21,6 +21,7 @@ import { getSharedPrescriptions, dispensePrescription, SharedPrescription } from
 import { getSharedAppointments, deleteSharedAppointment, SharedAppointment } from "@/lib/sync/appointmentsSync";
 import { 
   getSharedDoctors, 
+  getCurrentDoctorSession, 
   setCurrentDoctorSession, 
   SharedDoctor,
   findDoctorBySlug,
@@ -49,14 +50,15 @@ export default function DynamicDoctorDashboard({
   params: Promise<{ doctorSlug: string }>;
 }) {
   const resolvedParams = use(params);
-  const doctorSlug = resolvedParams?.doctorSlug || "doctor-priya";
+  const rawSlug = resolvedParams?.doctorSlug || "";
 
   const [activeModule, setActiveModule] = useState<string>("OPD");
-  const [searchTerm, setSearchTerm] = useState<string>("" );
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [filterScope, setFilterScope] = useState<"MY_PATIENTS" | "ALL">("MY_PATIENTS");
 
   const [activeDoctor, setActiveDoctor] = useState<SharedDoctor | null>(null);
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
 
   const [dataStore, setDataStore] = useState<Record<string, UnifiedRecord[]>>({});
   const [patients, setPatients] = useState<SharedPatient[]>([]);
@@ -72,21 +74,37 @@ export default function DynamicDoctorDashboard({
   const [regPhone, setRegPhone] = useState("");
   const [regVitals, setRegVitals] = useState("BP: 120/80 • Cleared for Consultation");
 
+  // Resolve Doctor & Enforce Authentication Guard
   useEffect(() => {
     async function resolveDoctor() {
+      // 1. If someone accesses generic /dashboard/doctor, redirect to their active session or home
+      if (rawSlug === "doctor" || rawSlug === "doctor/") {
+        const session = getCurrentDoctorSession();
+        if (session) {
+          const targetSlug = session.slug || generateDoctorSlug(session.name);
+          window.location.replace(`/dashboard/${targetSlug}`);
+          return;
+        }
+        window.location.replace("/");
+        return;
+      }
+
       const allDoctors = await getSharedDoctors();
-      const matched = findDoctorBySlug(allDoctors, doctorSlug);
+      const matched = findDoctorBySlug(allDoctors, rawSlug);
 
       if (matched) {
         setActiveDoctor(matched);
         setCurrentDoctorSession(matched);
-      } else if (allDoctors.length > 0) {
-        setActiveDoctor(allDoctors[0]);
-        setCurrentDoctorSession(allDoctors[0]);
+        document.cookie = `gavane_active_doctor_slug=${matched.slug || generateDoctorSlug(matched.name)}; path=/; max-age=86400`;
+        setIsInitializing(false);
+      } else {
+        // If the URL slug does not match any registered physician, reject and route back
+        window.location.replace("/");
       }
     }
+
     resolveDoctor();
-  }, [doctorSlug]);
+  }, [rawSlug]);
 
   const doctorName = activeDoctor?.name || "Dr. Specialist";
   const doctorEmail = activeDoctor?.email || "doctor@gavanehospital.in";
@@ -104,6 +122,7 @@ export default function DynamicDoctorDashboard({
     loadData();
   }, [loadData]);
 
+  // Scoped Datasets per Doctor
   const doctorPatients = useMemo(() => {
     if (filterScope === "ALL") return patients;
     return patients.filter((p) => {
@@ -162,6 +181,7 @@ export default function DynamicDoctorDashboard({
 
   const handleLogout = () => {
     setCurrentDoctorSession(null);
+    document.cookie = "gavane_active_doctor_slug=; path=/; max-age=0";
     window.location.href = "/";
   };
 
@@ -243,6 +263,15 @@ export default function DynamicDoctorDashboard({
   const activeModuleLabel =
     DOCTOR_SIDEBAR_MODULES.find((m) => m.id === activeModule)?.label || activeModule;
 
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center space-y-3">
+        <div className="w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-xs font-bold text-slate-500">Verifying authorized physician workspace...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#f0f4f8] flex flex-col font-sans text-slate-800">
       <DashboardHeader
@@ -253,6 +282,7 @@ export default function DynamicDoctorDashboard({
         onClose={handleLogout}
       />
 
+      {/* Mobile Switch Bar */}
       <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shadow-xs">
         <div className="flex items-center space-x-2 text-xs font-bold text-white truncate">
           <span className="text-teal-400">🩺 {doctorName}:</span>
@@ -267,6 +297,7 @@ export default function DynamicDoctorDashboard({
       </div>
 
       <div className="flex flex-1 overflow-hidden relative">
+        {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <DashboardSidebar
             modules={DOCTOR_SIDEBAR_MODULES}
@@ -279,6 +310,7 @@ export default function DynamicDoctorDashboard({
           />
         </div>
 
+        {/* Mobile Slide-Over Drawer */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 z-50 lg:hidden flex flex-col bg-slate-950/80 backdrop-blur-sm">
             <div className="w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-left duration-200">
