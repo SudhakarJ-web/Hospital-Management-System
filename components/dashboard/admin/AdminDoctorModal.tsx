@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { SharedDoctor, generateDoctorSlug } from "@/lib/sync/doctorsSync";
-import { X, Lock, Mail, Stethoscope, Award, IndianRupee, ShieldCheck, Upload, Image as ImageIcon } from "lucide-react";
+import { X, Lock, Mail, Stethoscope, Award, IndianRupee, ShieldCheck, Upload } from "lucide-react";
 
 interface AdminDoctorModalProps {
   isOpen: boolean;
@@ -67,14 +67,13 @@ export default function AdminDoctorModal({
 
   if (!isOpen) return null;
 
-  // Handle local image selection from PC
+  // Read local PC image as Base64 data URL
   const handleLocalImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check size limit (1.5 MB max recommended for inline Base64 storage)
     if (file.size > 1.5 * 1024 * 1024) {
-      setErrorMsg("Image size exceeds 1.5MB. Please choose a smaller photo.");
+      setErrorMsg("Image size exceeds 1.5MB. Please choose a smaller file.");
       return;
     }
 
@@ -115,7 +114,11 @@ export default function AdminDoctorModal({
           })
           .eq("id", doctor.id);
 
-        if (error) throw error;
+        if (error) {
+          setErrorMsg(error.message || error.details || "Database update failed.");
+          setLoading(false);
+          return;
+        }
       } else {
         // INSERT NEW DOCTOR
         const randomRef = `GH-2026-${Math.floor(100 + Math.random() * 900)}`;
@@ -138,14 +141,21 @@ export default function AdminDoctorModal({
             },
           ]);
 
-        if (error) throw error;
+        if (error) {
+          setErrorMsg(error.message || error.details || "Database insert failed.");
+          setLoading(false);
+          return;
+        }
       }
 
       onSaved();
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to persist doctor record in Supabase.";
-      setErrorMsg(msg);
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? (err as { message: string }).message
+          : JSON.stringify(err);
+      setErrorMsg(msg || "Failed to persist doctor record in Supabase.");
     } finally {
       setLoading(false);
     }
@@ -175,7 +185,7 @@ export default function AdminDoctorModal({
         </div>
 
         {errorMsg && (
-          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl">
+          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl whitespace-pre-wrap break-all">
             {errorMsg}
           </div>
         )}
@@ -292,7 +302,7 @@ export default function AdminDoctorModal({
                 <input
                   type="email"
                   required
-                  placeholder="rajesh@gmail.com"
+                  placeholder="rajesh.sharma@gmail.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
