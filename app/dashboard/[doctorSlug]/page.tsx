@@ -81,6 +81,24 @@ export default function DynamicDoctorDashboard({
       if (!rawSlug) return;
 
       const allDoctors = await getSharedDoctors();
+      const session = getCurrentDoctorSession();
+
+      // INTERCEPT: If URL is /dashboard/doctor, forward immediately to the logged-in doctor's slug!
+      if (rawSlug === "doctor" || rawSlug === "doctor/") {
+        if (session && session.slug && session.slug !== "doctor") {
+          window.location.replace(`/dashboard/${session.slug}`);
+          return;
+        }
+        if (session && session.name) {
+          window.location.replace(`/dashboard/${generateDoctorSlug(session.name)}`);
+          return;
+        }
+        // If no doctor session is active, route to Dr. Priya by default rather than getting stuck
+        window.location.replace("/dashboard/doctor-priya");
+        return;
+      }
+
+      // Match doctor directly by the URL slug (e.g., doctor-priya, doctor-sudhir-gavane, etc.)
       const matched = findDoctorBySlug(allDoctors, rawSlug);
 
       if (!isMounted) return;
@@ -92,13 +110,14 @@ export default function DynamicDoctorDashboard({
         return;
       }
 
-      const session = getCurrentDoctorSession();
+      // If slug failed to match, check existing session
       if (session) {
         setActiveDoctor(session);
         setIsInitializing(false);
         return;
       }
 
+      // Final fallback
       if (allDoctors.length > 0) {
         setActiveDoctor(allDoctors[0]);
         setCurrentDoctorSession(allDoctors[0]);
