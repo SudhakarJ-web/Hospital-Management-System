@@ -66,7 +66,6 @@ export default function DoctorClinicalForm({
     setSubmitting(true);
 
     try {
-      // Persist to Supabase prescriptions table
       await saveSharedPrescription({
         patient_name: patient.full_name,
         patient_phone: patient.phone,
@@ -77,7 +76,7 @@ export default function DoctorClinicalForm({
         investigations: selectedTests.join(", "),
         medications,
         diet_instructions: dietAdvice,
-        status: "Pending Dispensation",
+        status: "Pending Dispensation" as const,
       });
 
       onSuccess(`Consultation finalized and Rx transmitted to Pharmacy for ${patient.full_name}.`);
