@@ -76,19 +76,9 @@ export default function DynamicDoctorDashboard({
 
   useEffect(() => {
     async function resolveDoctor() {
-      // Direct redirect if requested path is literally "doctor"
-      if (rawSlug === "doctor" || rawSlug === "doctor/") {
-        const session = getCurrentDoctorSession();
-        if (session) {
-          const targetSlug = session.slug || generateDoctorSlug(session.name);
-          window.location.replace(`/dashboard/${targetSlug}`);
-          return;
-        }
-        window.location.replace("/");
-        return;
-      }
-
       const allDoctors = await getSharedDoctors();
+
+      // Find doctor using fuzzy and exact slug matching
       const matched = findDoctorBySlug(allDoctors, rawSlug);
 
       if (matched) {
@@ -98,13 +88,14 @@ export default function DynamicDoctorDashboard({
         return;
       }
 
-      // Check current session fallback if slug was not directly matched
+      // Check existing session
       const session = getCurrentDoctorSession();
       if (session && session.slug) {
         window.location.replace(`/dashboard/${session.slug}`);
         return;
       }
 
+      // If no physician matched and no session exists, send to home
       window.location.replace("/");
     }
 

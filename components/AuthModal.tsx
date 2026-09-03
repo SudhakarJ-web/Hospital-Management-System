@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { 
   Lock, Mail, Stethoscope, Users, Pill, KeyRound, AlertCircle, Key 
 } from "lucide-react";
@@ -20,9 +19,8 @@ interface AuthModalProps {
 type RoleType = "Admin" | "Doctor" | "Support" | "Medical";
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
-  const router = useRouter();
   const [activeRole, setActiveRole] = useState<RoleType>("Doctor");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState("ananya@gavanehospital.in");
   const [password, setPassword] = useState("password123");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -33,15 +31,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       const docs = await getSharedDoctors();
       const activeDocs = docs.filter((d) => d.status === "Active");
       setAvailableDoctors(activeDocs);
-      if (activeDocs.length > 0 && !email) {
-        setEmail(activeDocs[0].email);
-        setPassword(activeDocs[0].password || "password123");
-      }
     }
     if (isOpen) {
       loadDocs();
     }
-  }, [isOpen, email]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -52,9 +46,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       setEmail("admin@gavanehospital.in");
       setPassword("password123");
     } else if (role === "Doctor") {
-      const first = availableDoctors[0];
-      setEmail(first?.email || "ananya@gavanehospital.in");
-      setPassword(first?.password || "password123");
+      setEmail(availableDoctors[0]?.email || "ananya@gavanehospital.in");
+      setPassword(availableDoctors[0]?.password || "password123");
     } else if (role === "Support") {
       setEmail("support@gavanehospital.in");
       setPassword("password123");
@@ -72,7 +65,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
   const executeLogin = async () => {
     if (!email.trim()) {
-      setErrorMsg("Please enter an email address.");
+      setErrorMsg("Please enter your registered email address.");
       return;
     }
 
@@ -97,23 +90,25 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
         const validPassword = matchedDoctor.password || "password123";
         if (inputPass !== validPassword) {
-          setErrorMsg("Incorrect password. Please check your credentials.");
+          setErrorMsg("Incorrect password. Please verify your credentials.");
           setLoading(false);
           return;
         }
 
+        // Establish the doctor session
         setCurrentDoctorSession(matchedDoctor);
         onClose();
 
+        // Target: strictly prefix with /dashboard/
         const targetSlug = matchedDoctor.slug || generateDoctorSlug(matchedDoctor.name);
-        window.location.href = `/dashboard/${targetSlug}`;
+        window.location.replace(`/dashboard/${targetSlug}`);
         return;
       }
 
       if (activeRole === "Admin") {
         if (inputEmail === "admin@gavanehospital.in" && inputPass === "password123") {
           onClose();
-          window.location.href = "/dashboard/admin";
+          window.location.replace("/dashboard/admin");
           return;
         } else {
           setErrorMsg("Invalid Admin credentials.");
@@ -125,7 +120,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       if (activeRole === "Support") {
         if (inputEmail.includes("support") && inputPass === "password123") {
           onClose();
-          window.location.href = "/dashboard/support";
+          window.location.replace("/dashboard/support");
           return;
         } else {
           setErrorMsg("Invalid Support Staff credentials.");
@@ -137,7 +132,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       if (activeRole === "Medical") {
         if (inputEmail.includes("medical") && inputPass === "password123") {
           onClose();
-          window.location.href = "/dashboard/medical";
+          window.location.replace("/dashboard/medical");
           return;
         } else {
           setErrorMsg("Invalid Pharmacy / Medical Officer credentials.");
@@ -197,11 +192,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           })}
         </div>
 
-        {/* Doctor Quick Selector */}
+        {/* Quick Pick Preset Buttons for Doctors */}
         {activeRole === "Doctor" && availableDoctors.length > 0 && (
           <div className="space-y-1.5">
             <label className="block text-[10px] font-bold text-slate-600 uppercase">
-              Select Physician Account:
+              Select Doctor Account:
             </label>
             <div className="grid grid-cols-3 gap-1.5">
               {availableDoctors.map((d) => {

@@ -68,7 +68,7 @@ export const INITIAL_DOCTORS: SharedDoctor[] = [
   },
 ];
 
-const STORAGE_KEY = "gavane_shared_doctors_master_v3";
+const STORAGE_KEY = "gavane_shared_doctors_master_v4";
 const DOCTOR_SESSION_KEY = "gavane_current_active_doctor_session";
 
 export async function getSharedDoctors(): Promise<SharedDoctor[]> {
@@ -77,17 +77,10 @@ export async function getSharedDoctors(): Promise<SharedDoctor[]> {
     const raw = localStorage.getItem(STORAGE_KEY);
     let parsed: SharedDoctor[] = raw ? JSON.parse(raw) : INITIAL_DOCTORS;
 
-    // Guarantee correct slug generation for all doctors
-    parsed = parsed.map((doc) => {
-      let slug = doc.slug;
-      if (!slug || slug === "doctor") {
-        slug = generateDoctorSlug(doc.name);
-      }
-      return {
-        ...doc,
-        slug,
-      };
-    });
+    parsed = parsed.map((doc) => ({
+      ...doc,
+      slug: doc.slug && doc.slug !== "doctor" ? doc.slug : generateDoctorSlug(doc.name),
+    }));
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
     return parsed;
@@ -141,34 +134,28 @@ export function setCurrentDoctorSession(doctor: SharedDoctor | null) {
   if (typeof window === "undefined") return;
   if (!doctor) {
     localStorage.removeItem(DOCTOR_SESSION_KEY);
-    document.cookie = "gavane_active_doctor_slug=; path=/; max-age=0";
   } else {
     localStorage.setItem(DOCTOR_SESSION_KEY, JSON.stringify(doctor));
-    const slug = doctor.slug || generateDoctorSlug(doctor.name);
-    document.cookie = `gavane_active_doctor_slug=${slug}; path=/; max-age=86400`;
   }
 }
 
 export function findDoctorBySlug(doctors: SharedDoctor[], rawSlug: string): SharedDoctor | undefined {
   if (!rawSlug) return undefined;
-  const needle = rawSlug.toLowerCase().trim();
+  const needle = rawSlug.toLowerCase().trim().replace(/^\/+/g, "").replace(/^dashboard\//, "");
 
-  // 1. Direct match on slug
+  // 1. Direct slug match
   const direct = doctors.find((d) => d.slug.toLowerCase() === needle);
   if (direct) return direct;
 
-  // 2. Direct match on id
-  const idMatch = doctors.find((d) => d.id.toLowerCase() === needle);
-  if (idMatch) return idMatch;
+  // 2. Computed slug match
+  const comp = doctors.find((d) => generateDoctorSlug(d.name) === needle);
+  if (comp) return comp;
 
-  // 3. Computed slug match
-  const compMatch = doctors.find((d) => generateDoctorSlug(d.name) === needle);
-  if (compMatch) return compMatch;
-
-  // 4. Name keyword match
+  // 3. Partial keyword match (e.g., "doctor-ananya" -> Dr. Ananya Rao)
   const cleanNeedle = needle.replace(/^doctor-/, "");
   return doctors.find((d) => {
     const namePart = d.name.toLowerCase().replace(/^dr\.?\s*/i, "");
-    return namePart.includes(cleanNeedle) || cleanNeedle.includes(namePart.split(" ")[0]);
+    const firstName = namePart.split(" ")[0];
+    return cleanNeedle.includes(firstName) || firstName.includes(cleanNeedle);
   });
 }
