@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { 
   Lock, Mail, Stethoscope, Users, Pill, KeyRound, AlertCircle, Key 
 } from "lucide-react";
-import { getSharedDoctors, setCurrentDoctorSession, generateDoctorSlug } from "@/lib/sync/doctorsSync";
+import { getSharedDoctors, setCurrentDoctorSession, generateDoctorSlug, SharedDoctor } from "@/lib/sync/doctorsSync";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -17,10 +17,21 @@ type RoleType = "Admin" | "Doctor" | "Support" | "Medical";
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const router = useRouter();
   const [activeRole, setActiveRole] = useState<RoleType>("Doctor");
-  const [email, setEmail] = useState("priya@gavanehospital.in");
+  const [email, setEmail] = useState("ananya@gavanehospital.in");
   const [password, setPassword] = useState("password123");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [availableDoctors, setAvailableDoctors] = useState<SharedDoctor[]>([]);
+
+  useEffect(() => {
+    async function loadDocs() {
+      const docs = await getSharedDoctors();
+      setAvailableDoctors(docs.filter((d) => d.status === "Active"));
+    }
+    if (isOpen) {
+      loadDocs();
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -31,7 +42,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       setEmail("admin@gavanehospital.in");
       setPassword("password123");
     } else if (role === "Doctor") {
-      setEmail("priya@gavanehospital.in");
+      setEmail(availableDoctors[0]?.email || "ananya@gavanehospital.in");
       setPassword("password123");
     } else if (role === "Support") {
       setEmail("support@gavanehospital.in");
@@ -40,6 +51,12 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       setEmail("medical@gavanehospital.in");
       setPassword("password123");
     }
+  };
+
+  const handleSelectDoctorPreset = (doc: SharedDoctor) => {
+    setEmail(doc.email);
+    setPassword(doc.password || "password123");
+    setErrorMsg(null);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -70,11 +87,13 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           return;
         }
 
+        // Establish the exact doctor session
         setCurrentDoctorSession(matchedDoctor);
         onClose();
 
-        const doctorSlug = matchedDoctor.slug || generateDoctorSlug(matchedDoctor.name);
-        window.location.href = `/dashboard/${doctorSlug}`;
+        // Redirect directly to the doctor's specific slug URL
+        const targetSlug = matchedDoctor.slug || generateDoctorSlug(matchedDoctor.name);
+        window.location.href = `/dashboard/${targetSlug}`;
         return;
       }
 
@@ -137,6 +156,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           </div>
         </div>
 
+        {/* Role Tabs */}
         <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/80 text-[11px] font-bold">
           {[
             { id: "Admin", label: "Admin", icon: Key },
@@ -163,6 +183,34 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             );
           })}
         </div>
+
+        {/* Doctor Quick-Select Switcher */}
+        {activeRole === "Doctor" && availableDoctors.length > 0 && (
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-bold text-slate-600 uppercase">
+              Select Doctor Profile:
+            </label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {availableDoctors.map((d) => {
+                const isCurrent = email.toLowerCase() === d.email.toLowerCase();
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => handleSelectDoctorPreset(d)}
+                    className={`p-2 rounded-xl border text-[11px] font-bold text-center transition-all cursor-pointer truncate ${
+                      isCurrent
+                        ? "bg-teal-50 border-teal-500 text-teal-900 shadow-xs"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <div className="truncate">{d.name.replace(/^dr\.?\s*/i, "")}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {errorMsg && (
           <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl flex items-center space-x-2">

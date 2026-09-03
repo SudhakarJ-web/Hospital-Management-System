@@ -132,3 +132,27 @@ export function setCurrentDoctorSession(doctor: SharedDoctor | null) {
     localStorage.setItem(DOCTOR_SESSION_KEY, JSON.stringify(doctor));
   }
 }
+
+// Resilient fuzzy matcher for doctor slugs
+export function findDoctorBySlug(doctors: SharedDoctor[], rawSlug: string): SharedDoctor | undefined {
+  const needle = rawSlug.toLowerCase().trim();
+  
+  // 1. Direct slug or ID match
+  const exact = doctors.find(
+    (d) => d.slug?.toLowerCase() === needle || d.id.toLowerCase() === needle
+  );
+  if (exact) return exact;
+
+  // 2. Standard generated slug match
+  const genMatch = doctors.find(
+    (d) => generateDoctorSlug(d.name) === needle
+  );
+  if (genMatch) return genMatch;
+
+  // 3. Partial / first name matching (e.g., "doctor-ananya" matches "Dr. Ananya Rao")
+  const strippedNeedle = needle.replace(/^doctor-/, "");
+  return doctors.find((d) => {
+    const docFirstName = d.name.toLowerCase().replace(/^dr\.?\s*/i, "").split(" ")[0];
+    return strippedNeedle.includes(docFirstName) || docFirstName.includes(strippedNeedle);
+  });
+}

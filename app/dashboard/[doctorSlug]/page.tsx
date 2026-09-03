@@ -21,10 +21,9 @@ import { getSharedPrescriptions, dispensePrescription, SharedPrescription } from
 import { getSharedAppointments, deleteSharedAppointment, SharedAppointment } from "@/lib/sync/appointmentsSync";
 import { 
   getSharedDoctors, 
-  getCurrentDoctorSession, 
   setCurrentDoctorSession, 
   SharedDoctor,
-  generateDoctorSlug
+  findDoctorBySlug
 } from "@/lib/sync/doctorsSync";
 
 const DOCTOR_SIDEBAR_MODULES: SidebarModule[] = [
@@ -49,7 +48,7 @@ export default function DoctorSlugDashboardPage({
   params: Promise<{ doctorSlug: string }>;
 }) {
   const resolvedParams = use(params);
-  const doctorSlug = resolvedParams?.doctorSlug || "doctor-priya";
+  const doctorSlug = resolvedParams?.doctorSlug || "doctor-ananya-rao";
 
   const [activeModule, setActiveModule] = useState<string>("OPD");
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -72,25 +71,18 @@ export default function DoctorSlugDashboardPage({
   const [regPhone, setRegPhone] = useState("");
   const [regVitals, setRegVitals] = useState("BP: 120/80 • Cleared for Consultation");
 
+  // Resolve Doctor directly based on the URL Slug (Priority 1: URL determines the identity)
   useEffect(() => {
     async function resolveDoctor() {
       const allDoctors = await getSharedDoctors();
-      const matched = allDoctors.find(
-        (d) =>
-          d.slug?.toLowerCase() === doctorSlug.toLowerCase() ||
-          generateDoctorSlug(d.name) === doctorSlug.toLowerCase()
-      );
+      const matched = findDoctorBySlug(allDoctors, doctorSlug);
 
       if (matched) {
         setActiveDoctor(matched);
         setCurrentDoctorSession(matched);
-      } else {
-        const session = getCurrentDoctorSession();
-        if (session) {
-          setActiveDoctor(session);
-        } else if (allDoctors.length > 0) {
-          setActiveDoctor(allDoctors[0]);
-        }
+      } else if (allDoctors.length > 0) {
+        setActiveDoctor(allDoctors[0]);
+        setCurrentDoctorSession(allDoctors[0]);
       }
     }
     resolveDoctor();
@@ -112,6 +104,7 @@ export default function DoctorSlugDashboardPage({
     loadData();
   }, [loadData]);
 
+  // Scoped Datasets per Doctor
   const doctorPatients = useMemo(() => {
     if (filterScope === "ALL") return patients;
     return patients.filter((p) => {
