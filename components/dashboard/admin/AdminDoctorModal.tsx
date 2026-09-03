@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { SharedDoctor, generateDoctorSlug } from "@/lib/sync/doctorsSync";
-import { X, Lock, Mail, Stethoscope, Award, IndianRupee, ShieldCheck } from "lucide-react";
+import { X, Lock, Mail, Stethoscope, Award, IndianRupee, ShieldCheck, Upload, Image as ImageIcon } from "lucide-react";
 
 interface AdminDoctorModalProps {
   isOpen: boolean;
@@ -22,6 +22,8 @@ const DEPARTMENTS = [
   "Dermatology & Cosmetology",
   "ENT & Head-Neck Surgery",
 ];
+
+const DEFAULT_PORTRAIT = "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80";
 
 export default function AdminDoctorModal({
   isOpen,
@@ -48,23 +50,43 @@ export default function AdminDoctorModal({
       setEmail(doctor.email || "");
       setPassword(doctor.password || "password123");
       setFee(doctor.fee || "₹500");
-      setImage(doctor.image || "");
+      setImage(doctor.image || DEFAULT_PORTRAIT);
       setStatus(doctor.status || "Active");
     } else {
-      // New Doctor Defaults
       setFullName("");
       setDegree("MBBS, MD");
       setDepartment(DEPARTMENTS[0]);
       setEmail("");
       setPassword("Doctor@2026");
       setFee("₹500");
-      setImage("https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80");
+      setImage(DEFAULT_PORTRAIT);
       setStatus("Active");
     }
     setErrorMsg(null);
   }, [doctor, isOpen]);
 
   if (!isOpen) return null;
+
+  // Handle local image selection from PC
+  const handleLocalImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check size limit (1.5 MB max recommended for inline Base64 storage)
+    if (file.size > 1.5 * 1024 * 1024) {
+      setErrorMsg("Image size exceeds 1.5MB. Please choose a smaller photo.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setImage(reader.result);
+        setErrorMsg(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +99,7 @@ export default function AdminDoctorModal({
 
     try {
       if (doctor?.id) {
-        // UPDATE EXISTING DOCTOR IN SUPABASE
+        // UPDATE EXISTING DOCTOR
         const { error } = await supabase
           .from("doctors")
           .update({
@@ -87,7 +109,7 @@ export default function AdminDoctorModal({
             email: cleanEmail,
             password: password.trim(),
             fee: fee.trim(),
-            image: image.trim() || "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
+            image: image.trim() || DEFAULT_PORTRAIT,
             status,
             slug: computedSlug,
           })
@@ -95,7 +117,7 @@ export default function AdminDoctorModal({
 
         if (error) throw error;
       } else {
-        // CREATE NEW DOCTOR IN SUPABASE
+        // INSERT NEW DOCTOR
         const randomRef = `GH-2026-${Math.floor(100 + Math.random() * 900)}`;
 
         const { error } = await supabase
@@ -110,7 +132,7 @@ export default function AdminDoctorModal({
               email: cleanEmail,
               password: password.trim(),
               fee: fee.trim(),
-              image: image.trim() || "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
+              image: image.trim() || DEFAULT_PORTRAIT,
               status,
               created_at: new Date().toISOString(),
             },
@@ -142,7 +164,7 @@ export default function AdminDoctorModal({
 
         <div className="border-b border-slate-100 pb-3">
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-            Target: Doctors Management Console
+            TARGET: DOCTORS CONSOLE
           </span>
           <h2 className="text-lg font-black text-slate-900 mt-1">
             {doctor ? `Edit Credentials: ${doctor.name}` : "Onboard New Specialist Physician"}
@@ -159,6 +181,35 @@ export default function AdminDoctorModal({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Portrait Photo Picker */}
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center space-x-4">
+            <img
+              src={image || DEFAULT_PORTRAIT}
+              alt="Doctor Portrait Preview"
+              className="w-16 h-16 rounded-2xl object-cover border-2 border-teal-600 shadow-sm shrink-0 bg-white"
+            />
+            <div className="flex-1 min-w-0">
+              <label className="block text-[10px] font-extrabold uppercase text-slate-700 tracking-wider mb-1">
+                Doctor Portrait Photo *
+              </label>
+              <div className="flex items-center space-x-2">
+                <label className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 shadow-xs">
+                  <Upload className="w-3.5 h-3.5 text-teal-600" />
+                  <span>Choose from PC</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLocalImageSelect}
+                    className="hidden"
+                  />
+                </label>
+                <span className="text-[10px] text-slate-400 truncate">
+                  PNG, JPG, or WebP (max 1.5MB)
+                </span>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
@@ -186,7 +237,7 @@ export default function AdminDoctorModal({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. MBBS, MS (General Surgery)"
+                  placeholder="e.g. MBBS, MS (Orthopedics)"
                   value={degree}
                   onChange={(e) => setDegree(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -222,7 +273,7 @@ export default function AdminDoctorModal({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. ₹500"
+                  placeholder="e.g. ₹800"
                   value={fee}
                   onChange={(e) => setFee(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -234,14 +285,14 @@ export default function AdminDoctorModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                Portal Login Email *
+                Portal Login Email / Username *
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
                   type="email"
                   required
-                  placeholder="doctor.name@gavanehospital.in"
+                  placeholder="rajesh@gmail.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -258,7 +309,7 @@ export default function AdminDoctorModal({
                 <input
                   type="text"
                   required
-                  placeholder="Enter new password..."
+                  placeholder="Enter portal password..."
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-teal-900 focus:ring-2 focus:ring-teal-600 focus:outline-none font-mono"
@@ -267,35 +318,20 @@ export default function AdminDoctorModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                Doctor Portrait Image URL
-              </label>
-              <input
-                type="url"
-                placeholder="https://images.unsplash.com/..."
-                value={image}
-                onChange={(e) => setImage(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
-                <span>Account Status Flag</span>
-                <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as "Active" | "Pending" | "Suspended")}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-teal-600 focus:outline-none"
-              >
-                <option value="Active">Active / Approved</option>
-                <option value="Pending">Pending Verification</option>
-                <option value="Suspended">Suspended / Inactive</option>
-              </select>
-            </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+              <span>Account Status Flag</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
+            </label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as "Active" | "Pending" | "Suspended")}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-teal-600 focus:outline-none"
+            >
+              <option value="Active">Active / Approved</option>
+              <option value="Pending">Pending Verification</option>
+              <option value="Suspended">Suspended / Inactive</option>
+            </select>
           </div>
 
           <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
@@ -311,7 +347,7 @@ export default function AdminDoctorModal({
               disabled={loading}
               className="px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer"
             >
-              {loading ? "Saving to Supabase..." : doctor ? "Save Changes" : "Register Doctor"}
+              {loading ? "Registering..." : doctor ? "Save Changes" : "Register Doctor"}
             </button>
           </div>
         </form>
