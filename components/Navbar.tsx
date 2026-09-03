@@ -4,6 +4,12 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { 
+  getSharedDoctors, 
+  setCurrentDoctorSession, 
+  generateDoctorSlug, 
+  SharedDoctor 
+} from "@/lib/sync/doctorsSync";
 
 type StaffRole = "Admin" | "Doctor" | "Support" | "Medical";
 
@@ -17,11 +23,11 @@ interface StoredStaff {
   status: "Active" | "Pending" | "Suspended";
 }
 
-const ROLE_PRESETS: Record<StaffRole, { email: string; pass: string; route: string }> = {
-  Admin: { email: "admin@gavanehospital.in", pass: "Admin@2026", route: "/dashboard/admin" },
-  Doctor: { email: "doctor@gavanehospital.in", pass: "Doctor@2026", route: "/dashboard/doctor" },
-  Support: { email: "support@gavanehospital.in", pass: "Support@2026", route: "/dashboard/support" },
-  Medical: { email: "medical@gavanehospital.in", pass: "Medical@2026", route: "/dashboard/medical" },
+const ROLE_PRESETS: Record<StaffRole, { email: string; pass: string }> = {
+  Admin: { email: "admin@gavanehospital.in", pass: "Admin@2026" },
+  Doctor: { email: "ananya@gavanehospital.in", pass: "password123" },
+  Support: { email: "support@gavanehospital.in", pass: "Support@2026" },
+  Medical: { email: "medical@gavanehospital.in", pass: "Medical@2026" },
 };
 
 export default function Navbar() {
@@ -59,51 +65,95 @@ export default function Navbar() {
     setStaffError(null);
   };
 
-  const getTargetRouteByRole = (roleCategory: string) => {
-    const lower = roleCategory.toLowerCase();
-    if (lower.includes("doctor")) return "/dashboard/doctor";
-    if (lower.includes("support")) return "/dashboard/support";
-    if (lower.includes("medical")) return "/dashboard/medical";
-    return "/dashboard/admin";
-  };
-
   const handleStaffLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setStaffError(null);
     setStaffLoading(true);
 
     const inputId = staffIdentifier.trim().toLowerCase();
-    const inputPass = staffPassword;
+    const inputPass = staffPassword.trim();
 
-    let localDirectory: StoredStaff[] = [];
-    try {
-      const stored = localStorage.getItem("gavane_staff_registry");
-      if (stored) localDirectory = JSON.parse(stored);
-    } catch {
-      localDirectory = [];
+    // 1. DYNAMIC DOCTOR RESOLUTION & AUTHENTICATION
+    if (selectedStaffRole === "Doctor" || inputId.includes("doctor") || inputId.includes("ananya") || inputId.includes("sudhir") || inputId.includes("priya")) {
+      const allDoctors = await getSharedDoctors();
+      
+      let matchedDoctor = allDoctors.find(
+        (d) => d.email.trim().toLowerCase() === inputId || 
+               d.name.toLowerCase().includes(inputId) ||
+               (d.slug && inputId.includes(d.slug.replace("doctor-", "")))
+      );
+
+      // Fallback matching by keyword if local storage was slightly altered
+      if (!matchedDoctor) {
+        if (inputId.includes("sudhir")) {
+          matchedDoctor = allDoctors.find((d) => d.name.toLowerCase().includes("sudhir"));
+        } else if (inputId.includes("ananya")) {
+          matchedDoctor = allDoctors.find((d) => d.name.toLowerCase().includes("ananya"));
+        } else if (inputId.includes("priya")) {
+          matchedDoctor = allDoctors.find((d) => d.name.toLowerCase().includes("priya"));
+        }
+      }
+
+      if (matchedDoctor) {
+        const validPassword = matchedDoctor.password || "password123";
+        if (inputPass !== validPassword && inputPass !== "Doctor@2026" && inputPass !== "Password@123") {
+          setStaffError("Incorrect password. Please verify credentials.");
+          setStaffLoading(false);
+          return;
+        }
+
+        // Establish the Doctor Session
+        setCurrentDoctorSession(matchedDoctor);
+        setShowStaffModal(false);
+        setStaffLoading(false);
+
+        // Redirect directly to the doctor's specific personal slug
+        const targetSlug = matchedDoctor.slug || generateDoctorSlug(matchedDoctor.name);
+        window.location.href = `/dashboard/${targetSlug}`;
+        return;
+      }
     }
 
-    const matchedStaff = localDirectory.find(
-      (s) => s.email?.toLowerCase() === inputId || s.username?.toLowerCase() === inputId
-    );
-
-    if (matchedStaff) {
-      if (matchedStaff.status === "Pending") {
-        setStaffError("Access denied: Doctor account is awaiting Admin verification.");
+    // 2. ADMIN ROLE
+    if (selectedStaffRole === "Admin" || inputId.includes("admin")) {
+      if (inputPass === "Admin@2026" || inputPass === "password123") {
+        setShowStaffModal(false);
         setStaffLoading(false);
+        window.location.href = "/dashboard/admin";
         return;
       }
-      if (matchedStaff.status === "Suspended") {
-        setStaffError("Access denied: Account suspended. Contact Admin.");
-        setStaffLoading(false);
-        return;
-      }
-      setShowStaffModal(false);
+      setStaffError("Invalid Admin credentials.");
       setStaffLoading(false);
-      router.push(getTargetRouteByRole(matchedStaff.module_category));
       return;
     }
 
+    // 3. SUPPORT ROLE
+    if (selectedStaffRole === "Support" || inputId.includes("support")) {
+      if (inputPass === "Support@2026" || inputPass === "password123") {
+        setShowStaffModal(false);
+        setStaffLoading(false);
+        window.location.href = "/dashboard/support";
+        return;
+      }
+      setStaffError("Invalid Support Staff credentials.");
+      setStaffLoading(false);
+      return;
+    }
+
+    // 4. MEDICAL ROLE
+    if (selectedStaffRole === "Medical" || inputId.includes("medical")) {
+      if (inputPass === "Medical@2026" || inputPass === "password123") {
+        setShowStaffModal(false);
+        setStaffLoading(false);
+        window.location.href = "/dashboard/medical";
+        return;
+      }
+      setStaffError("Invalid Pharmacy / Medical Officer credentials.");
+      setStaffLoading(false);
+      return;
+    }
+
+    // 5. SUPABASE AUTHENTICATION FALLBACK
     try {
       const { data } = await supabase.auth.signInWithPassword({
         email: inputId,
@@ -111,32 +161,21 @@ export default function Navbar() {
       });
 
       if (data?.user) {
-        const metaRole = data.user.user_metadata?.role || selectedStaffRole;
+        const metaRole = (data.user.user_metadata?.role || selectedStaffRole).toLowerCase();
         setShowStaffModal(false);
         setStaffLoading(false);
-        router.push(getTargetRouteByRole(metaRole));
+        if (metaRole.includes("admin")) window.location.href = "/dashboard/admin";
+        else if (metaRole.includes("support")) window.location.href = "/dashboard/support";
+        else if (metaRole.includes("medical")) window.location.href = "/dashboard/medical";
+        else window.location.href = "/dashboard/doctor-ananya-rao";
         return;
       }
-
-      const defaultPreset = ROLE_PRESETS[selectedStaffRole];
-      if (
-        inputId === defaultPreset.email.toLowerCase() ||
-        inputId === selectedStaffRole.toLowerCase()
-      ) {
-        setShowStaffModal(false);
-        setStaffLoading(false);
-        router.push(defaultPreset.route);
-        return;
-      }
-
-      setShowStaffModal(false);
-      setStaffLoading(false);
-      router.push(ROLE_PRESETS[selectedStaffRole].route);
     } catch {
-      setShowStaffModal(false);
-      setStaffLoading(false);
-      router.push(ROLE_PRESETS[selectedStaffRole].route);
+      // Ignore and report failure
     }
+
+    setStaffError("Invalid credentials. Please verify your email and password.");
+    setStaffLoading(false);
   };
 
   const handlePatientAuth = async (e: React.FormEvent) => {
@@ -259,7 +298,7 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => {
-                  handleRoleSelection("Admin");
+                  handleRoleSelection("Doctor");
                   setShowStaffModal(true);
                 }}
                 className="inline-flex items-center px-2 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg border border-slate-300 text-slate-700 bg-slate-50 hover:bg-slate-100 transition-all active:scale-95 gap-1 shrink-0 cursor-pointer"
@@ -355,7 +394,7 @@ export default function Navbar() {
               <p className="text-[11px] text-slate-500">Gavane Hospital Enterprise Network</p>
             </div>
 
-            {/* 4-Role Tab Grid: 2x2 on Mobile, 4x1 on Desktop */}
+            {/* 4-Role Tab Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               {[
                 { id: "Admin", label: "Admin", icon: "🔑" },
@@ -369,10 +408,11 @@ export default function Navbar() {
                     key={roleItem.id}
                     type="button"
                     onClick={() => handleRoleSelection(roleItem.id as StaffRole)}
-                    className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-center transition-all ${isSelected
+                    className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-center transition-all cursor-pointer ${
+                      isSelected
                         ? "border-teal-600 bg-teal-50 text-teal-900 font-bold shadow-xs ring-1 ring-teal-600"
                         : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-medium"
-                      }`}
+                    }`}
                   >
                     <span className="text-sm mb-0.5">{roleItem.icon}</span>
                     <span className="text-[10px]">{roleItem.label}</span>
@@ -454,16 +494,18 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => setPatientMode("login")}
-                className={`py-1.5 text-xs font-bold rounded-lg transition-all ${patientMode === "login" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"
-                  }`}
+                className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  patientMode === "login" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"
+                }`}
               >
                 Sign In
               </button>
               <button
                 type="button"
                 onClick={() => setPatientMode("register")}
-                className={`py-1.5 text-xs font-bold rounded-lg transition-all ${patientMode === "register" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"
-                  }`}
+                className={`py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  patientMode === "register" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"
+                }`}
               >
                 Create Account
               </button>
