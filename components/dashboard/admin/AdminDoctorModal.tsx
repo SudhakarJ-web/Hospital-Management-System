@@ -121,28 +121,32 @@ export default function AdminDoctorModal({
         }
       } else {
         // INSERT NEW DOCTOR
-        const randomRef = `GH-2026-${Math.floor(100 + Math.random() * 900)}`;
+        const randomRef = `GH-2026-${Math.floor(1000 + Math.random() * 9000)}`;
 
-        const { error } = await supabase
+        const payload = {
+          reference_id: randomRef,
+          name: cleanName,
+          slug: computedSlug,
+          degree: degree.trim(),
+          department,
+          email: cleanEmail,
+          password: password.trim(),
+          fee: fee.trim(),
+          image: image.trim() || DEFAULT_PORTRAIT,
+          status,
+        };
+
+        const { data, error } = await supabase
           .from("doctors")
-          .insert([
-            {
-              reference_id: randomRef,
-              name: cleanName,
-              slug: computedSlug,
-              degree: degree.trim(),
-              department,
-              email: cleanEmail,
-              password: password.trim(),
-              fee: fee.trim(),
-              image: image.trim() || DEFAULT_PORTRAIT,
-              status,
-              created_at: new Date().toISOString(),
-            },
-          ]);
+          .insert([payload])
+          .select();
 
         if (error) {
-          setErrorMsg(error.message || error.details || "Database insert failed.");
+          console.error("Supabase Doctor Insert Error:", error);
+          const fullMessage = [error.message, error.details, error.hint]
+            .filter(Boolean)
+            .join(" — ");
+          setErrorMsg(fullMessage || "Database insert failed.");
           setLoading(false);
           return;
         }
