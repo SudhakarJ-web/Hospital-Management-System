@@ -2,14 +2,25 @@ export interface SharedDoctor {
   id: string;
   reference_id: string;
   name: string;
+  slug?: string;
   degree: string;
   department: string;
   email: string;
-  password?: string; // Admin-configured credential
+  password?: string;
   fee: string;
   image: string;
   status: "Active" | "Pending" | "Suspended";
   created_at: string;
+}
+
+export function generateDoctorSlug(name: string): string {
+  const cleanName = name
+    .toLowerCase()
+    .replace(/^dr\.?\s*/i, "")
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `doctor-${cleanName}`;
 }
 
 export const INITIAL_DOCTORS: SharedDoctor[] = [
@@ -17,6 +28,7 @@ export const INITIAL_DOCTORS: SharedDoctor[] = [
     id: "doc-1",
     reference_id: "GH-2026-001",
     name: "Dr. Ananya Rao",
+    slug: "doctor-ananya-rao",
     degree: "MBBS, MD (Cardiology), FACC",
     department: "Cardiology & Cardiac Sciences",
     email: "ananya@gavanehospital.in",
@@ -30,6 +42,7 @@ export const INITIAL_DOCTORS: SharedDoctor[] = [
     id: "doc-2",
     reference_id: "GH-2026-002",
     name: "Dr. Sudhir Gavane",
+    slug: "doctor-sudhir-gavane",
     degree: "MS (General & Laparoscopic Surgery), M.Ch",
     department: "General Surgery & Trauma",
     email: "sudhir@gavanehospital.in",
@@ -43,6 +56,7 @@ export const INITIAL_DOCTORS: SharedDoctor[] = [
     id: "doc-3",
     reference_id: "GH-2026-003",
     name: "Dr. Priya",
+    slug: "doctor-priya",
     degree: "MD (Internal Medicine & Pediatrics)",
     department: "General Medicine & Pediatrics",
     email: "priya@gavanehospital.in",
@@ -61,7 +75,11 @@ export async function getSharedDoctors(): Promise<SharedDoctor[]> {
   if (typeof window === "undefined") return INITIAL_DOCTORS;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : INITIAL_DOCTORS;
+    const parsed: SharedDoctor[] = raw ? JSON.parse(raw) : INITIAL_DOCTORS;
+    return parsed.map((doc) => ({
+      ...doc,
+      slug: doc.slug || generateDoctorSlug(doc.name),
+    }));
   } catch {
     return INITIAL_DOCTORS;
   }
@@ -69,14 +87,16 @@ export async function getSharedDoctors(): Promise<SharedDoctor[]> {
 
 export async function saveSharedDoctor(doctor: SharedDoctor): Promise<SharedDoctor[]> {
   const current = await getSharedDoctors();
-  const index = current.findIndex((d) => d.id === doctor.id);
+  const slug = doctor.slug || generateDoctorSlug(doctor.name);
+  const normalizedDoc: SharedDoctor = { ...doctor, slug };
 
+  const index = current.findIndex((d) => d.id === doctor.id);
   let updated: SharedDoctor[];
   if (index >= 0) {
     updated = [...current];
-    updated[index] = doctor;
+    updated[index] = normalizedDoc;
   } else {
-    updated = [doctor, ...current];
+    updated = [normalizedDoc, ...current];
   }
 
   if (typeof window !== "undefined") {

@@ -3,10 +3,9 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { 
-  Lock, Mail, ShieldCheck, Stethoscope, 
-  Users, Pill, KeyRound, AlertCircle, Key 
+  Lock, Mail, Stethoscope, Users, Pill, KeyRound, AlertCircle, Key 
 } from "lucide-react";
-import { getSharedDoctors, setCurrentDoctorSession } from "@/lib/sync/doctorsSync";
+import { getSharedDoctors, setCurrentDoctorSession, generateDoctorSlug } from "@/lib/sync/doctorsSync";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -71,12 +70,11 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
           return;
         }
 
-        // Set the active doctor session and pass identifier in the URL
         setCurrentDoctorSession(matchedDoctor);
         onClose();
-        
-        // Use window.location.href or router.push with search param for a clean state reset
-        window.location.href = `/dashboard/doctor?id=${encodeURIComponent(matchedDoctor.id)}`;
+
+        const doctorSlug = matchedDoctor.slug || generateDoctorSlug(matchedDoctor.name);
+        window.location.href = `/dashboard/${doctorSlug}`;
         return;
       }
 
