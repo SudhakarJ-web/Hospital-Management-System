@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { useRouter } from "next/navigation";
 import { 
   getSharedDoctors, 
   setCurrentDoctorSession, 
@@ -11,7 +10,6 @@ import {
 type AppRole = "admin" | "doctor" | "support" | "medical" | "patient";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<AppRole>("doctor");
   const [email, setEmail] = useState("sudhir@gavanehospital.in");
   const [password, setPassword] = useState("Password@123");
@@ -67,21 +65,15 @@ export default function LoginPage() {
           return;
         }
 
-        // Set session
         setCurrentDoctorSession(matchedDoctor);
-
-        // Save active cookie for middleware resolution
         const targetSlug = matchedDoctor.slug || generateDoctorSlug(matchedDoctor.name);
-        document.cookie = `gavane_active_doctor_slug=${targetSlug}; path=/; max-age=86400`;
-
-        // Direct navigation to dedicated doctor URL
-        window.location.replace(`/dashboard/${targetSlug}`);
+        window.location.href = `/dashboard/${targetSlug}`;
         return;
       }
 
       if (selectedRole === "admin") {
         if (inputEmail === "admin@gavanehospital.in" && inputPass === "password123") {
-          window.location.replace("/dashboard/admin");
+          window.location.href = "/dashboard/admin";
           return;
         }
         setErrorMsg("Invalid Admin credentials.");
@@ -91,7 +83,7 @@ export default function LoginPage() {
 
       if (selectedRole === "support") {
         if (inputEmail.includes("support") && inputPass === "password123") {
-          window.location.replace("/dashboard/support");
+          window.location.href = "/dashboard/support";
           return;
         }
         setErrorMsg("Invalid Support Staff credentials.");
@@ -101,7 +93,7 @@ export default function LoginPage() {
 
       if (selectedRole === "medical") {
         if (inputEmail.includes("medical") && inputPass === "password123") {
-          window.location.replace("/dashboard/medical");
+          window.location.href = "/dashboard/medical";
           return;
         }
         setErrorMsg("Invalid Pharmacy / Medical credentials.");
@@ -110,7 +102,7 @@ export default function LoginPage() {
       }
 
       if (selectedRole === "patient") {
-        window.location.replace("/dashboard/patient");
+        window.location.href = "/dashboard/patient";
         return;
       }
     } catch {
@@ -131,7 +123,6 @@ export default function LoginPage() {
           <p className="text-xs text-slate-500 mt-1">Gavane Hospital & Research Centre</p>
         </div>
 
-        {/* Role Tabs */}
         <div className="grid grid-cols-5 gap-1 p-1 bg-slate-100 rounded-xl text-[11px] font-bold">
           {(["admin", "doctor", "support", "medical", "patient"] as AppRole[]).map((r) => (
             <button
