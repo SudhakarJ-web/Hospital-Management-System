@@ -10,8 +10,8 @@ interface LedgerTableProps {
   headers: string[];
   searchTerm: string;
   onSearchChange: (val: string) => void;
-  onOpenEdit: (item: UnifiedRecord) => void;
-  onDelete: (id: string, name: string) => void;
+  onOpenEdit?: (item: UnifiedRecord) => void;
+  onDelete?: (id: string, name: string) => void | Promise<void>;
   readOnly?: boolean;
 }
 
@@ -113,20 +113,24 @@ export default function LedgerTable({
                   </td>
                   {!readOnly && (
                     <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
-                      <button
-                        onClick={() => onOpenEdit(item)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
-                        title="Edit Entry"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => onDelete(item.id, item.col1)}
-                        className="p-1.5 text-red-500 hover:bg-red-50 rounded cursor-pointer"
-                        title="Delete Entry"
-                      >
-                        🗑️
-                      </button>
+                      {onOpenEdit && (
+                        <button
+                          onClick={() => onOpenEdit(item)}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
+                          title="Edit Entry"
+                        >
+                          ✏️
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button
+                          onClick={() => onDelete(item.id, item.col1)}
+                          className="p-1.5 text-red-500 hover:bg-red-50 rounded cursor-pointer"
+                          title="Delete Entry"
+                        >
+                          🗑️
+                        </button>
+                      )}
                     </td>
                   )}
                 </tr>
