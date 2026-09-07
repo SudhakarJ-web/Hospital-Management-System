@@ -101,17 +101,30 @@ export default function HomePage() {
             </a>
           </nav>
 
-          <div className="flex items-center space-x-2.5">
+          <div className="flex items-center space-x-2">
+            {/* Patient Portal Login */}
             <button
-              onClick={() => setIsAuthOpen(true)}
-              className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5"
+              onClick={() => {
+                setIsAuthOpen(true);
+              }}
+              className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 shadow-2xs"
             >
               <UserCheck className="w-3.5 h-3.5 text-teal-700" />
+              <span>Patient Portal</span>
+            </button>
+
+            {/* Staff Access Login */}
+            <button
+              onClick={() => setIsAuthOpen(true)}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5"
+            >
               <span>Staff Login</span>
             </button>
+
+            {/* Book Outpatient Visit */}
             <button
               onClick={handleGeneralBooking}
-              className="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-extrabold uppercase tracking-wider rounded-xl shadow-sm transition-all cursor-pointer"
+              className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-extrabold uppercase tracking-wider rounded-xl shadow-sm transition-all cursor-pointer"
             >
               Book OPD
             </button>

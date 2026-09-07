@@ -41,7 +41,7 @@ export default function AppointmentBookingModal({
   const [submitting, setSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Fetch real doctors from Supabase
+  // 1. Fetch live doctors from database
   useEffect(() => {
     async function loadDoctors() {
       const data = await getSharedDoctors();
@@ -52,26 +52,28 @@ export default function AppointmentBookingModal({
     }
   }, [isOpen]);
 
-  // Set active doctor when opened or changed
+  // 2. Set initial chosen doctor when modal opens or selectedDoctor changes
   useEffect(() => {
     if (selectedDoctor?.id) {
       setChosenDoctorId(selectedDoctor.id);
     } else if (doctorsList.length > 0 && !chosenDoctorId) {
       setChosenDoctorId(doctorsList[0].id);
     }
-  }, [selectedDoctor, doctorsList, chosenDoctorId]);
+  }, [selectedDoctor, doctorsList]);
 
   if (!isOpen) return null;
 
-  const activeDoc = doctorsList.find((d) => d.id === chosenDoctorId) || selectedDoctor;
+  // The active doctor is strictly whatever the dropdown currently has selected
+  const activeDoctor =
+    doctorsList.find((d) => d.id === chosenDoctorId) || selectedDoctor || doctorsList[0];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setStatusMessage(null);
 
-    const doctorName = activeDoc?.name || "Attending Physician";
-    const doctorDepartment = activeDoc?.department || "General Medicine";
+    const doctorName = activeDoctor?.name || "Consultant Physician";
+    const doctorDepartment = activeDoctor?.department || "General Medicine";
 
     try {
       // 1. Save directly to public.appointments
@@ -80,7 +82,7 @@ export default function AppointmentBookingModal({
         phone: phone.trim(),
         department: doctorDepartment,
         assigned_doctor: doctorName,
-        doctor_id: activeDoc?.id || undefined,
+        doctor_id: activeDoctor?.id,
         appointment_date: appointmentDate,
         time_slot: timeSlot,
         reason: reason.trim() || "Consultation",
@@ -93,8 +95,8 @@ export default function AppointmentBookingModal({
         phone: phone.trim(),
         department: doctorDepartment,
         assigned_doctor: doctorName,
-        doctor_id: activeDoc?.id || undefined,
-        notes: `Booked online visit: ${appointmentDate} (${timeSlot}) - ${reason.trim() || "OPD"}`,
+        doctor_id: activeDoctor?.id,
+        notes: `Online Visit: ${appointmentDate} (${timeSlot}) - ${reason.trim() || "OPD"}`,
         status: "Active",
       });
 
@@ -113,7 +115,7 @@ export default function AppointmentBookingModal({
     } catch {
       setStatusMessage({
         type: "error",
-        text: "Failed to confirm appointment. Please check connection.",
+        text: "Failed to confirm appointment. Please verify connection.",
       });
     } finally {
       setSubmitting(false);
@@ -126,7 +128,7 @@ export default function AppointmentBookingModal({
         <button
           onClick={onClose}
           type="button"
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors"
+          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
@@ -136,10 +138,10 @@ export default function AppointmentBookingModal({
             Instant Outpatient Booking
           </span>
           <h2 className="text-lg font-black text-slate-900 mt-1">
-            Book with {activeDoc?.name || "Specialist Physician"}
+            Book with {activeDoctor?.name || "Specialist Physician"}
           </h2>
           <p className="text-xs text-slate-500">
-            Department: <strong className="text-teal-700">{activeDoc?.department || "Clinical OPD"}</strong> • Consultation Fee: <strong>{activeDoc?.fee || "₹500"}</strong>
+            Department: <strong className="text-teal-700">{activeDoctor?.department || "Clinical OPD"}</strong> • Consultation Fee: <strong>{activeDoctor?.fee || "₹500"}</strong>
           </p>
         </div>
 
@@ -220,7 +222,7 @@ export default function AppointmentBookingModal({
               >
                 {doctorsList.map((doc) => (
                   <option key={doc.id} value={doc.id}>
-                    {doc.name}
+                    {doc.name} ({doc.department.split(" ")[0]})
                   </option>
                 ))}
               </select>
@@ -255,7 +257,7 @@ export default function AppointmentBookingModal({
               <FileText className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
               <input
                 type="text"
-                placeholder={`Describe symptoms or notes for ${activeDoc?.name || "the doctor"}...`}
+                placeholder={`Describe symptoms or notes for ${activeDoctor?.name || "the doctor"}...`}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -267,16 +269,16 @@ export default function AppointmentBookingModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition-all flex items-center space-x-1"
+              className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
             >
-              <span>{submitting ? "Confirming..." : `Confirm Booking with ${activeDoc?.name || "Doctor"}`}</span>
+              {submitting ? "Confirming..." : `Confirm Booking with ${activeDoctor?.name || "Doctor"}`}
             </button>
           </div>
         </form>

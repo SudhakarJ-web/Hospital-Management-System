@@ -23,13 +23,13 @@ import {
 } from "lucide-react";
 
 interface DoctorSlugProps {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ doctorSlug?: string; slug?: string }>;
 }
 
 export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
   const router = useRouter();
   const resolvedParams = use(params);
-  const slug = resolvedParams.slug;
+  const doctorSlug = resolvedParams.doctorSlug || resolvedParams.slug;
 
   const [activeDoctor, setActiveDoctor] = useState<SharedDoctor | null>(null);
   const [allPatients, setAllPatients] = useState<SharedPatient[]>([]);
@@ -58,10 +58,20 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
         getSharedAppointments(),
       ]);
 
-      const matchedDoctor = doctorsList.find((d) => d.slug === slug);
+      const matchedDoctor = doctorsList.find(
+        (d) =>
+          d.slug === doctorSlug ||
+          d.slug === `doctor-${doctorSlug}` ||
+          doctorSlug?.includes(d.slug)
+      );
 
       if (!matchedDoctor) {
-        router.replace("/");
+        console.warn("Doctor slug not matched:", doctorSlug);
+        setNotification({
+          type: "error",
+          text: `Doctor record for "${doctorSlug}" was not found.`,
+        });
+        setLoading(false);
         return;
       }
 
@@ -69,21 +79,21 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
       setAllPatients(patientsData);
       setAllPrescriptions(rxData);
       setAllAppointments(apptData);
-    } catch {
-      setNotification({
-        type: "error",
-        text: "Failed to connect to Supabase cluster. Retrying...",
-      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Database connection failed";
+      setNotification({ type: "error", text: msg });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (slug) {
+    if (doctorSlug) {
       loadDashboardData();
+    } else {
+      setLoading(false);
     }
-  }, [slug]);
+  }, [doctorSlug]);
 
   if (loading) {
     return (
@@ -97,7 +107,19 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
   }
 
   if (!activeDoctor) {
-    return null;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-100 text-slate-700 p-4 space-y-3">
+        <AlertCircle className="w-10 h-10 text-rose-500" />
+        <h2 className="text-base font-black text-slate-900">Physician Profile Not Located</h2>
+        <p className="text-xs text-slate-500">Route slug: {doctorSlug}</p>
+        <button
+          onClick={() => router.push("/")}
+          className="px-4 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold"
+        >
+          Return to Hospital Portal
+        </button>
+      </div>
+    );
   }
 
   // Doctor Caseload Filtering Logic
@@ -113,7 +135,6 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
     return false;
   });
 
-  // Clinical Patients Pool for Form Selection
   const clinicalPatientsPool = showAllHospitalPatients
     ? allPatients
     : assignedPatients.length > 0
@@ -262,7 +283,6 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
 
       {/* Main Workspace Body */}
       <main className="p-4 sm:p-8 flex-1 max-w-7xl w-full mx-auto space-y-6">
-        {/* Tab 1: OPD Clinical Chart Console */}
         {activeTab === "clinical" && (
           <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm">
             <DoctorClinicalForm
@@ -278,7 +298,6 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
           </div>
         )}
 
-        {/* Tab 2: Assigned Patient Caseload */}
         {activeTab === "patients" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
@@ -296,16 +315,15 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
             </div>
 
             <RegistrationView
-             patients={assignedPatients}
-             searchTerm={patientSearch}
-             onSearchChange={setPatientSearch}
+              patients={assignedPatients}
+              searchTerm={patientSearch}
+              onSearchChange={setPatientSearch}
               onOpenEditPatient={() => {}}
-             onDeletePatient={() => {}}
+              onDeletePatient={() => {}}
             />
           </div>
         )}
 
-        {/* Tab 3: Scheduled Appointments */}
         {activeTab === "appointments" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
@@ -331,7 +349,6 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
           </div>
         )}
 
-        {/* Tab 4: Pharmacy Dispensary Queue */}
         {activeTab === "prescriptions" && (
           <div className="space-y-4">
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
