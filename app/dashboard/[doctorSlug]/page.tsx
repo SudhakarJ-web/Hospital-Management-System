@@ -2,14 +2,13 @@
 
 import React, { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { SharedDoctor, getSharedDoctors } from "@/lib/sync/doctorsSync";
 import { SharedPatient, getSharedPatients } from "@/lib/sync/patientsSync";
 import { SharedPrescription, getSharedPrescriptions, dispensePrescription } from "@/lib/sync/prescriptionsSync";
 import { SharedAppointment, getSharedAppointments } from "@/lib/sync/appointmentsSync";
 import DoctorClinicalForm from "@/components/dashboard/DoctorClinicalForm";
 import PrescriptionDispensary from "@/components/dashboard/shared/PrescriptionDispensary";
-import PatientsView from "@/components/dashboard/shared/PatientsView";
+import RegistrationView from "@/components/dashboard/shared/RegistrationView";
 import AppointmentsView from "@/components/dashboard/shared/AppointmentsView";
 import {
   Stethoscope,
@@ -17,11 +16,9 @@ import {
   Calendar,
   Pill,
   LogOut,
-  Building2,
+  ShieldCheck,
   CheckCircle2,
   AlertCircle,
-  Clock,
-  ShieldCheck,
   Filter,
 } from "lucide-react";
 
@@ -40,11 +37,11 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
   const [allAppointments, setAllAppointments] = useState<SharedAppointment[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Tab State
+  // Tab Navigation
   const [activeTab, setActiveTab] = useState<"clinical" | "patients" | "appointments" | "prescriptions">("clinical");
   const [showAllHospitalPatients, setShowAllHospitalPatients] = useState(false);
 
-  // Search States
+  // Search Filters
   const [patientSearch, setPatientSearch] = useState("");
   const [appointmentSearch, setAppointmentSearch] = useState("");
   const [prescriptionSearch, setPrescriptionSearch] = useState("");
@@ -75,7 +72,7 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
     } catch {
       setNotification({
         type: "error",
-        text: "Failed to establish live database connection. Retrying...",
+        text: "Failed to connect to Supabase cluster. Retrying...",
       });
     } finally {
       setLoading(false);
@@ -116,7 +113,7 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
     return false;
   });
 
-  // Decide which patient list is fed into DoctorClinicalForm
+  // Clinical Patients Pool for Form Selection
   const clinicalPatientsPool = showAllHospitalPatients
     ? allPatients
     : assignedPatients.length > 0
@@ -125,7 +122,7 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col text-slate-800 font-sans">
-      {/* Top Administrative Bar */}
+      {/* Top Header */}
       <header className="bg-slate-900 text-white px-4 sm:px-8 py-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 sticky top-0 z-30 shadow-md">
         <div className="flex items-center space-x-3.5">
           <img
@@ -164,7 +161,7 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
         </div>
       </header>
 
-      {/* Navigation Sub-Header */}
+      {/* Tab Navigation */}
       <div className="bg-white border-b border-slate-200 px-4 sm:px-8 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
         <div className="flex space-x-2 sm:space-x-6 text-xs font-extrabold uppercase tracking-wider overflow-x-auto">
           <button
@@ -235,7 +232,7 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
         )}
       </div>
 
-      {/* Notification Toast */}
+      {/* Notification Banner */}
       {notification && (
         <div className="max-w-7xl mx-auto w-full px-4 sm:px-8 mt-4">
           <div
@@ -298,12 +295,12 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
               </span>
             </div>
 
-            <PatientsView
-              patients={assignedPatients}
-              searchTerm={patientSearch}
-              onSearchChange={setPatientSearch}
-              onOpenEdit={() => {}}
-              onDeletePatient={() => {}}
+            <RegistrationView
+             patients={assignedPatients}
+             searchTerm={patientSearch}
+             onSearchChange={setPatientSearch}
+              onOpenEditPatient={() => {}}
+             onDeletePatient={() => {}}
             />
           </div>
         )}
