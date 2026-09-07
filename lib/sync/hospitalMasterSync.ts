@@ -84,12 +84,17 @@ export async function deleteLiveModuleRecord(
   }
 }
 
-// Backward-compatible memory stub for components during initial mount
+// Backward-compatible stubs & aliases for legacy dashboard callers
 export function getUniversalStore(): Record<string, UnifiedRecord[]> {
   return {};
 }
 
 export function deleteUniversalRecord(moduleName: string, id: string): Record<string, UnifiedRecord[]> {
   deleteLiveModuleRecord(moduleName, id);
+  return {};
+}
+
+export function saveUniversalRecord(moduleName: string, record: Partial<UnifiedRecord>): Record<string, UnifiedRecord[]> {
+  saveLiveModuleRecord(moduleName, record);
   return {};
 }
