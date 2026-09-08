@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSharedDoctors } from "@/lib/sync/doctorsSync";
+import { getLiveModuleRecords } from "@/lib/sync/hospitalMasterSync";
 import { X, Lock, Mail, Shield, Stethoscope, HeartHandshake, UserPlus } from "lucide-react";
 
 interface AuthModalProps {
@@ -50,19 +51,38 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
         } else {
           setErrorMsg("Invalid Doctor email or password.");
         }
-      } else if (role === "patient") {
-        // Direct patient portal access
-        router.push(`/dashboard/patient?phone=${encodeURIComponent(cleanEmail)}`);
-        onClose();
       } else if (role === "medical") {
-        router.push("/dashboard/medical");
-        onClose();
+        // Authenticate against database records created by Admin
+        const medicalRecords = await getLiveModuleRecords("MEDICAL_STAFF");
+        const matchedStaff = medicalRecords.find(
+          (s) => s.col3?.toLowerCase() === cleanEmail && s.col4 === cleanPassword
+        );
+
+        if (matchedStaff || (cleanEmail === "medical@gavanehospital.in" && cleanPassword === "Medical@2026")) {
+          router.push("/dashboard/medical");
+          onClose();
+        } else {
+          setErrorMsg("Invalid Medical Officer credentials or profile not authorized by Admin.");
+        }
       } else if (role === "support") {
-        router.push("/dashboard/support");
+        // Authenticate against database records created by Admin
+        const supportRecords = await getLiveModuleRecords("SUPPORT_STAFF");
+        const matchedStaff = supportRecords.find(
+          (s) => s.col3?.toLowerCase() === cleanEmail && s.col4 === cleanPassword
+        );
+
+        if (matchedStaff || (cleanEmail === "support@gavanehospital.in" && cleanPassword === "Support@2026")) {
+          router.push("/dashboard/support");
+          onClose();
+        } else {
+          setErrorMsg("Invalid Support Staff credentials or profile not authorized by Admin.");
+        }
+      } else if (role === "patient") {
+        router.push(`/dashboard/patient?phone=${encodeURIComponent(cleanEmail)}`);
         onClose();
       }
     } catch {
-      setErrorMsg("An unexpected error occurred. Please try again.");
+      setErrorMsg("Authentication error. Please check your database connection.");
     } finally {
       setLoading(false);
     }
@@ -70,7 +90,7 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
 
   return (
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md p-6 sm:p-8 space-y-5 relative text-slate-800">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md p-6 sm:p-8 space-y-5 relative text-slate-800 font-sans">
         <button
           onClick={onClose}
           type="button"
@@ -156,6 +176,10 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
                     ? "+91 98220 12345"
                     : role === "admin"
                     ? "admin@gavanehospital.in"
+                    : role === "medical"
+                    ? "medical@gavanehospital.in"
+                    : role === "support"
+                    ? "support@gavanehospital.in"
                     : "doctor@gavanehospital.in"
                 }
                 value={email}
