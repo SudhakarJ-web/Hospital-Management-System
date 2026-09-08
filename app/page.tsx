@@ -1,8 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Image from "next/image";
-import Link from "next/link";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { SharedDoctor, getSharedDoctors } from "@/lib/sync/doctorsSync";
 import AppointmentBookingModal from "@/components/AppointmentBookingModal";
@@ -18,12 +16,10 @@ import {
   Users,
   Award,
   ArrowRight,
-  CheckCircle2,
-  Building2,
   Lock,
 } from "lucide-react";
 
-export default function LandingPage() {
+function LandingPageContent() {
   const searchParams = useSearchParams();
   const [doctors, setDoctors] = useState<SharedDoctor[]>([]);
   const [selectedDoctor, setSelectedDoctor] = useState<SharedDoctor | null>(null);
@@ -38,7 +34,7 @@ export default function LandingPage() {
     }
     loadDoctors();
 
-    // Check if user was redirected to login
+    // Check if user was redirected to login with query param
     const loginQuery = searchParams.get("login");
     if (loginQuery && ["admin", "doctor", "medical", "support"].includes(loginQuery)) {
       setAuthRole(loginQuery as any);
@@ -58,7 +54,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
-      {/* Top Banner */}
+      {/* Top Notification / Emergency Bar */}
       <div className="bg-slate-900 text-slate-300 text-xs px-6 py-2 flex flex-wrap items-center justify-between border-b border-slate-800">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-1.5">
@@ -229,7 +225,7 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      {/* Outpatient Booking Dialog */}
+      {/* Outpatient Booking Modal */}
       <AppointmentBookingModal
         isOpen={bookingModalOpen}
         selectedDoctor={selectedDoctor}
@@ -237,12 +233,26 @@ export default function LandingPage() {
         onSuccess={() => {}}
       />
 
-      {/* Staff Authentication Gateway Dialog */}
+      {/* Staff Authentication Modal */}
       <AuthModal
         isOpen={authModalOpen}
         defaultRole={authRole}
         onClose={() => setAuthModalOpen(false)}
       />
     </div>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white text-xs font-bold uppercase tracking-widest font-sans">
+          Loading Gavane Hospital Portal...
+        </div>
+      }
+    >
+      <LandingPageContent />
+    </Suspense>
   );
 }
