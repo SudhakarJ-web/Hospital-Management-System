@@ -44,7 +44,7 @@ export default function AppointmentBookingModal({
     text: string;
   } | null>(null);
 
-  // 1. Fetch live active doctors from Supabase
+  // 1. Fetch available doctors on mount/open
   useEffect(() => {
     async function loadDoctors() {
       const data = await getSharedDoctors();
@@ -55,20 +55,25 @@ export default function AppointmentBookingModal({
     }
   }, [isOpen]);
 
-  // 2. Synchronize selected doctor on modal open or doctor switch
+  // 2. Initialize chosen doctor ONLY when modal opens or selectedDoctor explicitly changes
   useEffect(() => {
-    if (selectedDoctor?.id) {
-      setChosenDoctorId(selectedDoctor.id);
-    } else if (doctorsList.length > 0 && !chosenDoctorId) {
-      setChosenDoctorId(doctorsList[0].id);
+    if (isOpen) {
+      if (selectedDoctor?.id) {
+        setChosenDoctorId(selectedDoctor.id);
+      } else if (doctorsList.length > 0) {
+        setChosenDoctorId(doctorsList[0].id);
+      }
     }
-  }, [selectedDoctor, doctorsList, chosenDoctorId]);
+  }, [isOpen, selectedDoctor]);
 
   if (!isOpen) return null;
 
-  // Active doctor derived directly from the current dropdown selection
+  // Active doctor strictly follows the chosen ID from dropdown or props
   const activeDoctor =
-    doctorsList.find((d) => d.id === chosenDoctorId) || selectedDoctor || doctorsList[0];
+    doctorsList.find((d) => d.id === chosenDoctorId) ||
+    (selectedDoctor?.id === chosenDoctorId ? selectedDoctor : null) ||
+    selectedDoctor ||
+    doctorsList[0];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,7 +121,7 @@ export default function AppointmentBookingModal({
         if (onSuccess) onSuccess();
       }, 1500);
     } catch (err: unknown) {
-      console.error("Booking error details:", err);
+      console.error("Booking submission error:", err);
       const detail =
         err instanceof Error
           ? err.message
