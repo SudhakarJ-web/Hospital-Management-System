@@ -1,480 +1,550 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import DashboardSidebar, { SidebarModule } from "@/components/dashboard/DashboardSidebar";
-import LedgerTable from "@/components/dashboard/shared/LedgerTable";
-import RegistrationView from "@/components/dashboard/shared/RegistrationView";
-import CertificatesView from "@/components/dashboard/shared/CertificatesView";
-import PrescriptionDispensary from "@/components/dashboard/shared/PrescriptionDispensary";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { SharedDoctor, getSharedDoctors, deleteSharedDoctor } from "@/lib/sync/doctorsSync";
+import { SharedAppointment, getSharedAppointments, deleteSharedAppointment } from "@/lib/sync/appointmentsSync";
+import { SharedPatient, getSharedPatients, deleteSharedPatient } from "@/lib/sync/patientsSync";
+import { SharedPrescription, getSharedPrescriptions } from "@/lib/sync/prescriptionsSync";
+import { getLiveModuleRecords, saveLiveModuleRecord, deleteLiveModuleRecord, UnifiedRecord } from "@/lib/sync/hospitalMasterSync";
 import AppointmentsView from "@/components/dashboard/shared/AppointmentsView";
+import RegistrationView from "@/components/dashboard/shared/RegistrationView";
+import PrescriptionDispensary from "@/components/dashboard/shared/PrescriptionDispensary";
+import CertificatesView from "@/components/dashboard/shared/CertificatesView";
 import AdminDoctorModal from "@/components/dashboard/admin/AdminDoctorModal";
-
-import { supabase } from "@/lib/supabase";
-import { SharedDoctor } from "@/lib/sync/doctorsSync";
 import {
-  getUniversalStore,
-  deleteUniversalRecord,
-  UnifiedRecord,
-} from "@/lib/sync/hospitalMasterSync";
-import { getSharedPatients, saveSharedPatient, deleteSharedPatient, SharedPatient } from "@/lib/sync/patientsSync";
-import { getSharedCertificates, deleteSharedCertificate, SharedCertificate } from "@/lib/sync/certificatesSync";
-import { getSharedPrescriptions, dispensePrescription, SharedPrescription } from "@/lib/sync/prescriptionsSync";
-import { getSharedAppointments, deleteSharedAppointment, SharedAppointment } from "@/lib/sync/appointmentsSync";
+  Activity,
+  Users,
+  Calendar,
+  Stethoscope,
+  Pill,
+  BedDouble,
+  Scissors,
+  Scan,
+  FlaskConical,
+  Boxes,
+  Receipt,
+  BarChart3,
+  Wrench,
+  FileCheck,
+  ShieldAlert,
+  RotateCw,
+  Power,
+  Plus,
+  Trash2,
+  Edit2,
+  HeartHandshake,
+  UserCheck,
+} from "lucide-react";
 
-const ADMIN_SIDEBAR_MODULES: SidebarModule[] = [
-  { id: "MASTER", label: "MASTER EXECUTIVE DESK", icon: "🏛️" },
-  { id: "DOCTORS", label: "DOCTORS DIRECTORY", icon: "🩺" },
-  { id: "APPOINTMENTS", label: "ONLINE APPOINTMENTS", icon: "📅" },
-  { id: "REGISTRATION", label: "PATIENT REGISTRATION", icon: "👤" },
-  { id: "DISPENSARY", label: "PRESCRIPTION DISPENSARY", icon: "💊" },
-  { id: "IPD", label: "IPD (IN-PATIENT)", icon: "🛏️" },
-  { id: "OT", label: "OT (OPERATION THEATRE)", icon: "✂️" },
-  { id: "RADIOLOGY", label: "RADIOLOGY", icon: "📡" },
-  { id: "PATHOLOGY", label: "PATHOLOGY", icon: "🔬" },
-  { id: "STOCK", label: "PHARMACY STOCK", icon: "📦" },
-  { id: "BILLING", label: "BILLING LEDGER", icon: "💳" },
-  { id: "ANALYSIS", label: "ANALYSIS SYSTEM", icon: "📊" },
-  { id: "UTILITY", label: "UTILITY", icon: "⚙️" },
-  { id: "CERTIFICATES", label: "CERTIFICATES", icon: "📄" },
-];
+export default function AdminDashboardPage() {
+  const router = useRouter();
 
-export default function AdminDashboard() {
-  const [activeModule, setActiveModule] = useState<string>("DOCTORS");
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
-
-  // Database-backed Doctors State
   const [doctors, setDoctors] = useState<SharedDoctor[]>([]);
-  const [selectedDoctor, setSelectedDoctor] = useState<SharedDoctor | null>(null);
-  const [isDoctorModalOpen, setIsDoctorModalOpen] = useState<boolean>(false);
-  const [doctorSearchTerm, setDoctorSearchTerm] = useState<string>("");
-
-  // Clinical & Departmental Datastores
-  const [dataStore, setDataStore] = useState<Record<string, UnifiedRecord[]>>({});
-  const [patients, setPatients] = useState<SharedPatient[]>([]);
-  const [certificates, setCertificates] = useState<SharedCertificate[]>([]);
-  const [prescriptions, setPrescriptions] = useState<SharedPrescription[]>([]);
   const [appointments, setAppointments] = useState<SharedAppointment[]>([]);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [patients, setPatients] = useState<SharedPatient[]>([]);
+  const [prescriptions, setPrescriptions] = useState<SharedPrescription[]>([]);
+  const [medicalStaff, setMedicalStaff] = useState<UnifiedRecord[]>([]);
+  const [supportStaff, setSupportStaff] = useState<UnifiedRecord[]>([]);
+  const [ledgerRecords, setLedgerRecords] = useState<UnifiedRecord[]>([]);
 
-  // Patient Registration Modal State
-  const [showRegModal, setShowRegModal] = useState<boolean>(false);
-  const [isEditingPt, setIsEditingPt] = useState<boolean>(false);
-  const [editPtId, setEditPtId] = useState<string | null>(null);
-  const [regName, setRegName] = useState("");
-  const [regPhone, setRegPhone] = useState("");
-  const [regDept, setRegDept] = useState("General Medicine & Pediatrics");
-  const [regDoctor, setRegDoctor] = useState("");
-  const [regVitals, setRegVitals] = useState("BP: 120/80 • Cleared for Consultation");
+  const [loading, setLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [activeTab, setActiveTab] = useState<
+    | "desk"
+    | "doctors"
+    | "medical_staff"
+    | "support_staff"
+    | "appointments"
+    | "registration"
+    | "dispensary"
+    | "ipd"
+    | "ot"
+    | "radiology"
+    | "pathology"
+    | "pharmacy"
+    | "billing"
+    | "analysis"
+    | "utility"
+    | "certificates"
+  >("appointments");
 
-  // Fetch doctors directly from live Supabase table
-  const loadLiveDoctors = useCallback(async () => {
+  // Search States
+  const [searchTerm, setSearchTerm] = useState("");
+  const [doctorModalOpen, setDoctorModalOpen] = useState(false);
+  const [selectedDoctor, setSelectedDoctor] = useState<SharedDoctor | null>(null);
+
+  const loadData = async () => {
+    setIsSyncing(true);
     try {
-      const { data, error } = await supabase
-        .from("doctors")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const [docData, apptData, patData, rxData, medData, supData] = await Promise.all([
+        getSharedDoctors(),
+        getSharedAppointments(),
+        getSharedPatients(),
+        getSharedPrescriptions(),
+        getLiveModuleRecords("MEDICAL_STAFF"),
+        getLiveModuleRecords("SUPPORT_STAFF"),
+      ]);
 
-      if (!error && data) {
-        setDoctors(data as SharedDoctor[]);
+      setDoctors(docData);
+      setAppointments(apptData);
+      setPatients(patData);
+      setPrescriptions(rxData);
+      setMedicalStaff(medData);
+      setSupportStaff(supData);
+
+      const moduleMap: Record<string, string> = {
+        ipd: "IPD",
+        ot: "OT",
+        radiology: "RADIOLOGY",
+        pathology: "PATHOLOGY",
+        pharmacy: "STOCK",
+        billing: "BILLING",
+        analysis: "ANALYSIS",
+        utility: "UTILITY",
+      };
+
+      if (moduleMap[activeTab]) {
+        const recs = await getLiveModuleRecords(moduleMap[activeTab]);
+        setLedgerRecords(recs);
       }
-    } catch (err) {
-      console.error("Failed to fetch doctors from Supabase:", err);
+    } finally {
+      setLoading(false);
+      setIsSyncing(false);
     }
-  }, []);
-
-  const loadData = useCallback(async () => {
-    await loadLiveDoctors();
-    setDataStore(getUniversalStore());
-    setPatients(await getSharedPatients());
-    setCertificates(await getSharedCertificates());
-    setPrescriptions(await getSharedPrescriptions());
-    setAppointments(await getSharedAppointments());
-  }, [loadLiveDoctors]);
+  };
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [activeTab]);
 
-  const handleLogout = () => {
-    window.location.href = "/";
+  const handleDeleteAppointment = async (id: string) => {
+    if (!confirm("Are you sure you want to cancel this appointment?")) return;
+    await deleteSharedAppointment(id);
+    loadData();
   };
 
-  const handleDeleteDoctor = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to permanently remove ${name} from the hospital registry?`)) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase.from("doctors").delete().eq("id", id);
-      if (error) throw error;
-
-      setFeedback({ type: "success", text: `Successfully removed ${name} from the database.` });
-      await loadLiveDoctors();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to delete physician profile.";
-      setFeedback({ type: "error", text: msg });
-    }
+  const handleDeleteDoctor = async (id: string) => {
+    if (!confirm("Remove this doctor from the active medical board?")) return;
+    await deleteSharedDoctor(id);
+    loadData();
   };
 
-  const handleOpenAddPatient = () => {
-    setIsEditingPt(false);
-    setEditPtId(null);
-    setRegName("");
-    setRegPhone("");
-    setRegDept(doctors[0]?.department || "General Medicine & Pediatrics");
-    setRegDoctor(doctors[0]?.name || "Chief Medical Officer");
-    setRegVitals("BP: 120/80 • Cleared for Consultation");
-    setShowRegModal(true);
-  };
+  const handleAddStaffMember = async (type: "MEDICAL_STAFF" | "SUPPORT_STAFF") => {
+    const name = prompt(`Enter ${type === "MEDICAL_STAFF" ? "Medical Officer" : "Support Staff"} Full Legal Name:`);
+    if (!name) return;
+    const role = prompt("Enter Designation / Role (e.g. Head Nurse, Ward Incharge, Billing Clerk):") || "Executive";
+    const contact = prompt("Enter Contact Mobile Number:") || "+91 98000 00000";
 
-  const handleOpenEditPatient = (p: SharedPatient) => {
-    setIsEditingPt(true);
-    setEditPtId(p.id);
-    setRegName(p.full_name);
-    setRegPhone(p.phone);
-    setRegDept(p.department || "General Medicine");
-    setRegDoctor(p.assigned_doctor || "Hospital Specialist");
-    setRegVitals(p.notes || "BP: 120/80 • Routine Triage");
-    setShowRegModal(true);
-  };
-
-  const handleSavePatient = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const randomSuffix = Math.floor(100 + Math.random() * 900);
-    const ptObj: SharedPatient = {
-      id: editPtId || `pat-${Date.now()}`,
-      reference_id:
-        isEditingPt && editPtId
-          ? patients.find((p) => p.id === editPtId)?.reference_id || `GH-2026-REG${randomSuffix}`
-          : `GH-2026-REG${randomSuffix}`,
-      full_name: regName.trim(),
-      phone: regPhone.trim() || "+91 98000 00000",
-      department: regDept,
-      assigned_doctor: regDoctor || doctors[0]?.name || "Consultant Physician",
-      notes: regVitals,
+    await saveLiveModuleRecord(type, {
+      col1: name,
+      col2: role,
+      col3: contact,
       status: "Active",
-      created_at: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
-    };
-
-    const updated = await saveSharedPatient(ptObj);
-    setPatients(updated);
-    setFeedback({
-      type: "success",
-      text: `Patient ${regName} ${isEditingPt ? "updated" : "registered"} successfully.`,
     });
-    setShowRegModal(false);
+    loadData();
   };
 
-  const handleDeleteRecord = (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to remove ${name}?`)) return;
-    const updated = deleteUniversalRecord(activeModule, id);
-    setDataStore(updated);
-    setFeedback({ type: "success", text: `Removed ${name} from ${activeModule} ledger.` });
+  const handleDeleteStaffMember = async (type: "MEDICAL_STAFF" | "SUPPORT_STAFF", id: string) => {
+    if (!confirm("Remove staff credential record?")) return;
+    await deleteLiveModuleRecord(type, id);
+    loadData();
   };
-
-  const filteredDoctors = useMemo(() => {
-    const q = doctorSearchTerm.toLowerCase().trim();
-    if (!q) return doctors;
-    return doctors.filter(
-      (d) =>
-        d.name.toLowerCase().includes(q) ||
-        d.department.toLowerCase().includes(q) ||
-        d.email.toLowerCase().includes(q) ||
-        d.reference_id.toLowerCase().includes(q)
-    );
-  }, [doctors, doctorSearchTerm]);
-
-  const getHeaders = (mod: string) => {
-    switch (mod) {
-      case "IPD":
-        return ["Ref ID", "Patient Name", "Bed & Ward No", "Department Ward", "Admission Date", "Consultant Doctor", "Status", "Controls"];
-      case "OT":
-        return ["Ref ID", "Surgical Procedure", "Patient Name", "OT Theater Room", "Scheduled Slot", "Chief Surgeon", "Status", "Controls"];
-      case "RADIOLOGY":
-        return ["Ref ID", "Imaging Scan", "Patient Name", "Radiology Suite", "Timestamp", "Findings", "Status", "Controls"];
-      case "PATHOLOGY":
-        return ["Ref ID", "Diagnostic Panel", "Sample ID", "Lab Section", "Patient Name", "Results", "Status", "Controls"];
-      case "STOCK":
-        return ["Item ID", "Medication Name", "SKU Identifier", "Dispenser Unit", "Stock Balance", "Batch / Expiry", "Status", "Controls"];
-      case "BILLING":
-        return ["Invoice ID", "Patient Name", "Service Description", "Amount", "Receipt Particulars", "Clearance Status", "Status", "Controls"];
-      case "ANALYSIS":
-        return ["Metric ID", "KPI Indicator", "Volume Metric", "Benchmark", "Prescription Summary", "Performance", "Status", "Controls"];
-      case "UTILITY":
-        return ["Unit ID", "Equipment", "Location", "Calibration Status", "Sensor Check", "Readiness", "Status", "Controls"];
-      default:
-        return ["Ref ID", "Subject", "Details", "Department", "Parameters", "Notes", "Status", "Controls"];
-    }
-  };
-
-  const activeModuleLabel =
-    ADMIN_SIDEBAR_MODULES.find((m) => m.id === activeModule)?.label || activeModule;
 
   return (
-    <div className="min-h-screen bg-[#f0f4f8] flex flex-col font-sans text-slate-800">
-      <DashboardHeader
-        roleIcon="🏛️"
-        loggedAsText="Hospital Administrator (admin@gavanehospital.in)"
-        roleSubtitle="Central Administrative & Medical Governance Desk"
-        bannerText="Welcome to the Executive Operations Console"
-        onClose={handleLogout}
-      />
-
-      {/* Mobile Bar */}
-      <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shadow-xs">
-        <div className="flex items-center space-x-2 text-xs font-bold text-white truncate">
-          <span className="text-teal-400">🏛️ Admin:</span>
-          <span className="uppercase text-teal-300 truncate">{activeModuleLabel}</span>
-        </div>
-        <button
-          onClick={() => setMobileMenuOpen((prev) => !prev)}
-          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center space-x-1 cursor-pointer"
-        >
-          <span>{mobileMenuOpen ? "✕ Close" : "☰ Switch Module"}</span>
-        </button>
-      </div>
-
-      <div className="flex flex-1 overflow-hidden relative">
-        {/* Desktop Sidebar */}
-        <div className="hidden lg:block">
-          <DashboardSidebar
-            modules={ADMIN_SIDEBAR_MODULES}
-            activeModule={activeModule}
-            onSelectModule={(id) => {
-              setActiveModule(id);
-              setSearchTerm("");
-            }}
-            sectionTitle="Administrative Control"
-          />
-        </div>
-
-        {/* Mobile Slide Drawer */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden flex flex-col bg-slate-950/80 backdrop-blur-sm">
-            <div className="w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-left duration-200">
-              <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
-                <span className="font-bold text-xs uppercase tracking-wider text-teal-400">Hospital Administration</span>
-                <button
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 font-bold hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-1">
-                {ADMIN_SIDEBAR_MODULES.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => {
-                      setActiveModule(m.id);
-                      setSearchTerm("");
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                      activeModule === m.id ? "bg-teal-600 text-white shadow-sm" : "text-slate-700 hover:bg-slate-100"
-                    }`}
-                  >
-                    <span>{m.icon}</span>
-                    <span className="truncate">{m.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex-1" onClick={() => setMobileMenuOpen(false)} />
+    <div className="min-h-screen bg-[#07131b] text-slate-200 flex flex-col font-sans">
+      {/* Top Administrative Header */}
+      <header className="bg-[#050f16] border-b border-slate-800/80 px-6 py-3 flex items-center justify-between z-30 shadow-md">
+        <div className="flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-xl bg-teal-700/80 border border-teal-500/30 flex items-center justify-center text-white font-black shadow-xs">
+            <Activity className="w-5 h-5 text-teal-300" />
           </div>
-        )}
+          <div>
+            <div className="text-xs font-black tracking-tight text-white uppercase">
+              GAVANE HOSPITAL & RESEARCH CENTRE
+            </div>
+            <div className="text-[10px] text-teal-400 font-bold">
+              • Central Administrative & Medical Governance Desk
+            </div>
+          </div>
+        </div>
 
-        <main className="flex-1 p-3 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 min-w-0">
-          {/* Action Top Bar */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-xs">
-            <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 px-1 py-0.5 min-w-0">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>
-              <span className="truncate">
-                Live Node: <strong className="text-teal-700">Supabase DB Cluster</strong> • Registered Specialists:{" "}
-                <strong className="text-slate-900">{doctors.length}</strong>
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-xl text-xs text-slate-300">
+            <ShieldAlert className="w-3.5 h-3.5 text-teal-400" />
+            <span>
+              Logged as: <strong className="text-white">Hospital Administrator</strong> (admin@gavanehospital.in)
+            </span>
+          </div>
+
+          <button
+            onClick={() => router.push("/")}
+            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer shadow-xs"
+          >
+            <Power className="w-3.5 h-3.5" />
+            <span>Close / Exit</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Main Workspace Frame */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Dark Enterprise Sidebar */}
+        <aside className="w-64 bg-[#07131b] border-r border-slate-800/80 flex flex-col justify-between p-3 shrink-0 overflow-y-auto">
+          <div className="space-y-1">
+            <div className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400">
+              ADMINISTRATIVE CONTROL
+            </div>
+
+            <button
+              onClick={() => setActiveTab("doctors")}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "doctors" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center space-x-2.5">
+                <Stethoscope className="w-4 h-4" />
+                <span>DOCTORS DIRECTORY</span>
+              </div>
+              <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded font-mono">{doctors.length}</span>
+            </button>
+
+            {/* Medical Staff Directory */}
+            <button
+              onClick={() => setActiveTab("medical_staff")}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "medical_staff" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center space-x-2.5">
+                <HeartHandshake className="w-4 h-4" />
+                <span>MEDICAL DIRECTORY</span>
+              </div>
+              <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded font-mono">{medicalStaff.length}</span>
+            </button>
+
+            {/* Support Staff Directory */}
+            <button
+              onClick={() => setActiveTab("support_staff")}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "support_staff" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center space-x-2.5">
+                <UserCheck className="w-4 h-4" />
+                <span>SUPPORT DIRECTORY</span>
+              </div>
+              <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded font-mono">{supportStaff.length}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("appointments")}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "appointments" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center space-x-2.5">
+                <Calendar className="w-4 h-4" />
+                <span>ONLINE APPOINTMENTS</span>
+              </div>
+              <span className="text-[10px] bg-teal-950 text-teal-300 border border-teal-700/50 px-1.5 py-0.5 rounded font-mono">{appointments.length}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("registration")}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "registration" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center space-x-2.5">
+                <Users className="w-4 h-4" />
+                <span>PATIENT REGISTRATION</span>
+              </div>
+              <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded font-mono">{patients.length}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("dispensary")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "dispensary" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Pill className="w-4 h-4" />
+              <span>PRESCRIPTION DISPENSARY</span>
+            </button>
+
+            <div className="pt-2 px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+              HOSPITAL LEDGERS
+            </div>
+
+            <button
+              onClick={() => setActiveTab("ipd")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "ipd" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <BedDouble className="w-4 h-4" />
+              <span>IPD (IN-PATIENT)</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("ot")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "ot" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Scissors className="w-4 h-4" />
+              <span>OT (OPERATION THEATRE)</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("radiology")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "radiology" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Scan className="w-4 h-4" />
+              <span>RADIOLOGY</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("pathology")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "pathology" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <FlaskConical className="w-4 h-4" />
+              <span>PATHOLOGY</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("pharmacy")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "pharmacy" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Boxes className="w-4 h-4" />
+              <span>PHARMACY STOCK</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("billing")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "billing" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Receipt className="w-4 h-4" />
+              <span>BILLING LEDGER</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("analysis")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "analysis" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>ANALYSIS SYSTEM</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("utility")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "utility" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Wrench className="w-4 h-4" />
+              <span>UTILITY</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("certificates")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "certificates" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <FileCheck className="w-4 h-4" />
+              <span>CERTIFICATES</span>
+            </button>
+          </div>
+
+          <div className="pt-4 border-t border-slate-800/60 text-[10px] text-slate-400 space-y-0.5">
+            <div className="font-bold text-slate-300">SHOURYA TECHNOLOGIES</div>
+            <div>Hadapsar, Pune, Maharashtra.</div>
+            <div>Contact: +91 9860043213</div>
+          </div>
+        </aside>
+
+        {/* Right Main Body */}
+        <main className="flex-1 bg-slate-100 p-6 overflow-y-auto">
+          {/* Top Status Bar */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 mb-5 flex items-center justify-between shadow-2xs">
+            <div className="flex items-center space-x-2 text-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-bold text-slate-700">
+                Live Node: <strong className="text-teal-700 font-mono">Supabase DB Cluster</strong>
+              </span>
+              <span className="text-slate-400">•</span>
+              <span className="text-slate-500">
+                Registered Specialists: <strong>{doctors.length}</strong>
               </span>
             </div>
 
-            <div className="flex items-center space-x-2 w-full sm:w-auto justify-end shrink-0">
+            <div className="flex items-center space-x-3">
               <button
                 onClick={loadData}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 cursor-pointer"
+                disabled={isSyncing}
+                className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs"
               >
-                <span>🔄</span>
+                <RotateCw className={`w-3.5 h-3.5 text-teal-600 ${isSyncing ? "animate-spin" : ""}`} />
                 <span>Sync Live</span>
-              </button>
-
-              <button
-                onClick={handleOpenAddPatient}
-                className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center space-x-1 cursor-pointer whitespace-nowrap"
-              >
-                <span>+</span>
-                <span>Register Patient</span>
               </button>
             </div>
           </div>
 
-          {feedback && (
-            <div
-              className={`p-3 rounded-xl border text-xs font-bold flex justify-between items-center ${
-                feedback.type === "success"
-                  ? "bg-emerald-50 border-emerald-300 text-emerald-900"
-                  : "bg-rose-50 border-rose-300 text-rose-900"
-              }`}
-            >
-              <span>{feedback.text}</span>
-              <button onClick={() => setFeedback(null)} className="font-bold px-2 py-0.5 hover:text-slate-900">
-                ✕
-              </button>
+          {/* ONLINE APPOINTMENTS VIEW (WITH EDIT & CANCEL CONTROLS) */}
+          {activeTab === "appointments" && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <AppointmentsView
+                appointments={appointments}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                onDeleteAppointment={handleDeleteAppointment}
+                onRefresh={loadData}
+              />
             </div>
           )}
 
-          {/* MASTER EXECUTIVE OVERVIEW DESK */}
-          {activeModule === "MASTER" && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Consultants</span>
-                  <span className="text-2xl font-black text-slate-900 mt-1 block">{doctors.length}</span>
-                  <span className="text-[10px] text-emerald-600 font-bold mt-1 block">Live in Database</span>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Active Patients</span>
-                  <span className="text-2xl font-black text-teal-700 mt-1 block">{patients.length}</span>
-                  <span className="text-[10px] text-slate-500 font-medium mt-1 block">Clinical Queue</span>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Appointments</span>
-                  <span className="text-2xl font-black text-indigo-700 mt-1 block">{appointments.length}</span>
-                  <span className="text-[10px] text-slate-500 font-medium mt-1 block">Scheduled Triage</span>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Dispensary Orders</span>
-                  <span className="text-2xl font-black text-amber-700 mt-1 block">{prescriptions.length}</span>
-                  <span className="text-[10px] text-slate-500 font-medium mt-1 block">Pharmacy Ledger</span>
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-2">
-                  System Architecture & Database Synchronization
-                </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  The hospital system operates with live database records. Adding or updating specialist credentials updates
-                  Supabase tables in real time. Dynamic routing routes doctors directly through their calculated slugs,
-                  enforcing role-level authentication.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* DOCTORS MANAGEMENT DESK */}
-          {activeModule === "DOCTORS" && (
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 sm:p-6 space-y-4">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* DOCTORS DIRECTORY */}
+          {activeTab === "doctors" && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-base font-black text-slate-900">
-                    Specialist Doctors & Medical Consultants
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Direct live table representation of <code>public.doctors</code>.
-                  </p>
+                  <h3 className="text-sm font-black text-slate-900">Hospital Medical Board Directory</h3>
+                  <p className="text-xs text-slate-500">Manage credentialed consultants, credentials, and fee structures.</p>
                 </div>
-
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    placeholder="Search by name, department, or email..."
-                    value={doctorSearchTerm}
-                    onChange={(e) => setDoctorSearchTerm(e.target.value)}
-                    className="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                  />
-                  <button
-                    onClick={() => {
-                      setSelectedDoctor(null);
-                      setIsDoctorModalOpen(true);
-                    }}
-                    className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center space-x-1 cursor-pointer whitespace-nowrap"
-                  >
-                    <span>+ Add Doctor</span>
-                  </button>
-                </div>
+                <button
+                  onClick={() => {
+                    setSelectedDoctor(null);
+                    setDoctorModalOpen(true);
+                  }}
+                  className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Add Doctor</span>
+                </button>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-700">
-                  <thead className="bg-slate-50 text-[10px] font-extrabold uppercase text-slate-500 border-b border-slate-200">
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-wider">
                     <tr>
                       <th className="py-2.5 px-3">Ref ID</th>
                       <th className="py-2.5 px-3">Doctor Profile</th>
-                      <th className="py-2.5 px-3">Specialty Department</th>
+                      <th className="py-2.5 px-3">Department</th>
                       <th className="py-2.5 px-3">Official Email</th>
-                      <th className="py-2.5 px-3">Portal Password</th>
-                      <th className="py-2.5 px-3">Slug Route</th>
-                      <th className="py-2.5 px-3">Fee</th>
+                      <th className="py-2.5 px-3">OPD Fee</th>
                       <th className="py-2.5 px-3">Status</th>
                       <th className="py-2.5 px-3 text-right">Controls</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-medium">
-                    {filteredDoctors.length === 0 ? (
-                      <tr>
-                        <td colSpan={9} className="py-8 text-center text-slate-400 italic">
-                          No doctors found in the database. Click &ldquo;+ Add Doctor&rdquo; to register one.
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                    {doctors.map((doc) => (
+                      <tr key={doc.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-2.5 px-3 font-mono text-teal-800 font-bold">{doc.reference_id}</td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center space-x-2">
+                          <img src={doc.image} alt={doc.name} className="w-7 h-7 rounded-full object-cover border border-teal-600" />
+                          <span>{doc.name}</span>
                         </td>
-                      </tr>
-                    ) : (
-                      filteredDoctors.map((doc) => (
-                        <tr key={doc.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-2.5 px-3 font-mono text-slate-500">{doc.reference_id}</td>
-                          <td className="py-2.5 px-3 flex items-center space-x-2.5">
-                            <img
-                              src={doc.image || "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80"}
-                              alt={doc.name}
-                              className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
-                            />
-                            <div className="min-w-0">
-                              <span className="font-bold text-slate-900 block truncate">{doc.name}</span>
-                              <span className="text-[10px] text-slate-400 block truncate">{doc.degree}</span>
-                            </div>
-                          </td>
-                          <td className="py-2.5 px-3">{doc.department}</td>
-                          <td className="py-2.5 px-3 font-mono text-slate-600">{doc.email}</td>
-                          <td className="py-2.5 px-3 font-mono text-teal-800 font-bold">{doc.password}</td>
-                          <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500">
-                            /dashboard/{doc.slug}
-                          </td>
-                          <td className="py-2.5 px-3 font-bold">{doc.fee}</td>
-                          <td className="py-2.5 px-3">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                                doc.status === "Active"
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                  : doc.status === "Pending"
-                                  ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                  : "bg-rose-50 text-rose-700 border border-rose-200"
-                              }`}
-                            >
-                              {doc.status}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 text-right space-x-2">
+                        <td className="py-2.5 px-3 text-slate-600">{doc.department}</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-500">{doc.email}</td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-teal-700">{doc.fee}</td>
+                        <td className="py-2.5 px-3">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {doc.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <div className="flex items-center justify-end space-x-1">
                             <button
                               onClick={() => {
                                 setSelectedDoctor(doc);
-                                setIsDoctorModalOpen(true);
+                                setDoctorModalOpen(true);
                               }}
-                              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-bold cursor-pointer transition-colors"
+                              className="p-1 text-slate-400 hover:text-teal-600 rounded"
                             >
-                              Edit
+                              <Edit2 className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => handleDeleteDoctor(doc.id, doc.name)}
-                              className="px-2 py-1 bg-rose-50 hover:bg-rose-100 rounded text-rose-600 font-bold cursor-pointer transition-colors"
+                              onClick={() => handleDeleteDoctor(doc.id)}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded"
                             >
-                              Delete
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* MEDICAL DIRECTORY (MEDICAL OFFICERS & NURSING LEADERSHIP) */}
+          {activeTab === "medical_staff" && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Clinical & Medical Officer Directory</h3>
+                  <p className="text-xs text-slate-500">Resident Medical Officers (RMO), Clinical Specialists, and Nursing Superintendents.</p>
+                </div>
+                <button
+                  onClick={() => handleAddStaffMember("MEDICAL_STAFF")}
+                  className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Register Medical Staff</span>
+                </button>
+              </div>
+
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                    <tr>
+                      <th className="py-2.5 px-3">Credential Ref</th>
+                      <th className="py-2.5 px-3">Clinician Name</th>
+                      <th className="py-2.5 px-3">Designation / Role</th>
+                      <th className="py-2.5 px-3">Contact Number</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3 text-right">Controls</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                    {medicalStaff.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-slate-400 text-xs italic">
+                          No medical officers listed yet. Click "+ Register Medical Staff" to record clinicians.
+                        </td>
+                      </tr>
+                    ) : (
+                      medicalStaff.map((staff) => (
+                        <tr key={staff.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-2.5 px-3 font-mono font-bold text-teal-800">{staff.reference_id}</td>
+                          <td className="py-2.5 px-3 font-bold text-slate-900">{staff.col1}</td>
+                          <td className="py-2.5 px-3 text-teal-700 font-semibold">{staff.col2}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-600">{staff.col3}</td>
+                          <td className="py-2.5 px-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              {staff.status}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              onClick={() => handleDeleteStaffMember("MEDICAL_STAFF", staff.id)}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </td>
                         </tr>
@@ -483,208 +553,124 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
 
-              <AdminDoctorModal
-                isOpen={isDoctorModalOpen}
-                doctor={selectedDoctor}
-                onClose={() => setIsDoctorModalOpen(false)}
-                onSaved={loadLiveDoctors}
+          {/* SUPPORT DIRECTORY (ADMIN, BILLING, PHARMACY & OPERATIONS) */}
+          {activeTab === "support_staff" && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Hospital Support & Operations Directory</h3>
+                  <p className="text-xs text-slate-500">Reception triage, billing officers, OT technicians, and ward assistants.</p>
+                </div>
+                <button
+                  onClick={() => handleAddStaffMember("SUPPORT_STAFF")}
+                  className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Register Support Staff</span>
+                </button>
+              </div>
+
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                    <tr>
+                      <th className="py-2.5 px-3">Credential Ref</th>
+                      <th className="py-2.5 px-3">Staff Member</th>
+                      <th className="py-2.5 px-3">Department Role</th>
+                      <th className="py-2.5 px-3">Contact</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3 text-right">Controls</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                    {supportStaff.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-slate-400 text-xs italic">
+                          No support staff registered yet. Click "+ Register Support Staff" to add members.
+                        </td>
+                      </tr>
+                    ) : (
+                      supportStaff.map((staff) => (
+                        <tr key={staff.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-2.5 px-3 font-mono font-bold text-teal-800">{staff.reference_id}</td>
+                          <td className="py-2.5 px-3 font-bold text-slate-900">{staff.col1}</td>
+                          <td className="py-2.5 px-3 text-slate-700 font-semibold">{staff.col2}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-600">{staff.col3}</td>
+                          <td className="py-2.5 px-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              {staff.status}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              onClick={() => handleDeleteStaffMember("SUPPORT_STAFF", staff.id)}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* PATIENT REGISTRATION VIEW */}
+          {activeTab === "registration" && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <RegistrationView
+                patients={patients}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                onOpenEditPatient={() => {}}
+                onDeletePatient={async (id) => {
+                  if (confirm("Delete patient record?")) {
+                    await deleteSharedPatient(id);
+                    loadData();
+                  }
+                }}
               />
             </div>
           )}
 
-          {activeModule === "APPOINTMENTS" && (
-            <AppointmentsView
-              appointments={appointments}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onDeleteAppointment={async (id, name) => {
-                if (!confirm(`Cancel appointment for ${name}?`)) return;
-                const updated = await deleteSharedAppointment(id);
-                setAppointments(updated);
-                setFeedback({ type: "success", text: `Cancelled appointment for ${name}.` });
-              }}
-            />
+          {/* PRESCRIPTION DISPENSARY */}
+          {activeTab === "dispensary" && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <PrescriptionDispensary
+                prescriptions={prescriptions}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                onDispense={() => {}}
+              />
+            </div>
           )}
 
-          {activeModule === "REGISTRATION" && (
-            <RegistrationView
-              patients={patients}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onOpenEditPatient={handleOpenEditPatient}
-              onDeletePatient={async (id, name) => {
-                if (!confirm(`Delete registered patient ${name}?`)) return;
-                const updated = await deleteSharedPatient(id);
-                setPatients(updated);
-                setFeedback({ type: "success", text: `Deleted patient ${name}.` });
-              }}
-            />
-          )}
-
-          {activeModule === "DISPENSARY" && (
-            <PrescriptionDispensary
-              prescriptions={prescriptions}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onDispense={async (id, pName) => {
-                const updated = await dispensePrescription(id, "Central Admin Clearance");
-                setPrescriptions(updated);
-                setFeedback({ type: "success", text: `Dispensed medication for ${pName}.` });
-              }}
-            />
-          )}
-
-          {activeModule === "CERTIFICATES" && (
-            <CertificatesView
-              certificates={certificates}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onDeleteCertificate={async (id, name) => {
-                if (!confirm(`Delete certificate for ${name}?`)) return;
-                const updated = await deleteSharedCertificate(id);
-                setCertificates(updated);
-                setFeedback({ type: "success", text: `Deleted certificate for ${name}.` });
-              }}
-            />
-          )}
-
-          {!["MASTER", "DOCTORS", "APPOINTMENTS", "REGISTRATION", "DISPENSARY", "CERTIFICATES"].includes(activeModule) && (
-            <LedgerTable
-              moduleName={activeModule}
-              records={dataStore[activeModule] || []}
-              headers={getHeaders(activeModule)}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onOpenEdit={() => {}}
-              onDelete={handleDeleteRecord}
-            />
+          {/* CERTIFICATES */}
+          {activeTab === "certificates" && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              {React.createElement(CertificatesView as any, {
+                doctorName: "Hospital Medical Superintendent",
+                doctorId: "admin",
+              })}
+            </div>
           )}
         </main>
       </div>
 
-      <footer className="bg-[#0b1b2b] text-slate-400 px-4 py-2 text-[10px] flex flex-col sm:flex-row items-center justify-between border-t border-slate-800 gap-1 text-center sm:text-left">
-        <div>Logged-in as: <strong className="text-teal-400">Hospital Administrator (admin@gavanehospital.in)</strong></div>
-        <div>
-          <button onClick={handleLogout} className="text-rose-400 hover:underline font-bold cursor-pointer mr-3">
-            Sign Out
-          </button>
-          Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected to DB</span>
-        </div>
-      </footer>
-
-      {/* Patient Registration Modal */}
-      {showRegModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 sm:p-6 space-y-4 my-auto max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                  Hospital Central Triage Desk
-                </span>
-                <h3 className="text-base font-extrabold text-slate-900 mt-1">
-                  {isEditingPt ? "Edit Patient Clinical Record" : "Register Patient into Clinical Caseload"}
-                </h3>
-              </div>
-              <button onClick={() => setShowRegModal(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
-            </div>
-
-            <form onSubmit={handleSavePatient} className="space-y-3.5">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                  Patient Full Legal Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Ramesh Jadhav"
-                  value={regName}
-                  onChange={(e) => setRegName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                    Contact Mobile Number *
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="e.g. +91 98765 43210"
-                    value={regPhone}
-                    onChange={(e) => setRegPhone(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                    Clinical Department *
-                  </label>
-                  <select
-                    value={regDept}
-                    onChange={(e) => setRegDept(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                  >
-                    <option value="Cardiology & Cardiac Sciences">Cardiology & Cardiac Sciences</option>
-                    <option value="General Surgery & Trauma">General Surgery & Trauma</option>
-                    <option value="General Medicine & Pediatrics">General Medicine & Pediatrics</option>
-                    <option value="Orthopedics & Joint Replacement">Orthopedics & Joint Replacement</option>
-                    <option value="Neurology & Neurosurgery">Neurology & Neurosurgery</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                  Assigned Consulting Physician *
-                </label>
-                <select
-                  value={regDoctor}
-                  onChange={(e) => setRegDoctor(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                >
-                  {doctors.map((d) => (
-                    <option key={d.id} value={d.name}>
-                      {d.name} ({d.department})
-                    </option>
-                  ))}
-                  {doctors.length === 0 && <option value="Duty Medical Officer">Duty Medical Officer</option>}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                  Observed Vitals & Triage Notes
-                </label>
-                <input
-                  type="text"
-                  value={regVitals}
-                  onChange={(e) => setRegVitals(e.target.value)}
-                  placeholder="BP: 120/80 • Pulse: 72 • Routine Triage"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowRegModal(false)}
-                  className="px-4 py-2 bg-slate-100 text-xs font-bold rounded-lg cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
-                >
-                  {isEditingPt ? "Save Patient Changes" : "Register Patient"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Admin Doctor Modal */}
+      {doctorModalOpen && (
+        <AdminDoctorModal
+          isOpen={doctorModalOpen}
+          doctor={selectedDoctor}
+          onClose={() => setDoctorModalOpen(false)}
+          onSaved={loadData}
+        />
       )}
     </div>
   );

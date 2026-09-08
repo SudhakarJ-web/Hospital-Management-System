@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { SharedDoctor, getSharedDoctors } from "@/lib/sync/doctorsSync";
 import { SharedPatient, getSharedPatients } from "@/lib/sync/patientsSync";
 import { SharedPrescription, getSharedPrescriptions, dispensePrescription } from "@/lib/sync/prescriptionsSync";
-import { SharedAppointment, getSharedAppointments } from "@/lib/sync/appointmentsSync";
+import { SharedAppointment, getSharedAppointments, deleteSharedAppointment } from "@/lib/sync/appointmentsSync";
 import { getLiveModuleRecords, saveLiveModuleRecord, deleteLiveModuleRecord, UnifiedRecord } from "@/lib/sync/hospitalMasterSync";
 import DoctorClinicalForm from "@/components/dashboard/DoctorClinicalForm";
 import PrescriptionDispensary from "@/components/dashboard/shared/PrescriptionDispensary";
@@ -187,6 +187,12 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
     await deleteLiveModuleRecord(moduleKey, id);
     const updated = await getLiveModuleRecords(moduleKey);
     setLedgerRecords(updated);
+  };
+
+  const handleDeleteAppointment = async (id: string) => {
+    if (!confirm("Are you sure you want to cancel this appointment?")) return;
+    await deleteSharedAppointment(id);
+    loadAllData();
   };
 
   return (
@@ -473,7 +479,8 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
                 appointments={myAppointments}
                 searchTerm=""
                 onSearchChange={() => {}}
-                onDeleteAppointment={() => {}}
+                onDeleteAppointment={handleDeleteAppointment}
+                onRefresh={loadAllData}
               />
             </div>
           )}
