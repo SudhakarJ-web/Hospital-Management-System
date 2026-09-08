@@ -1,366 +1,856 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { SharedDoctor, getSharedDoctors } from "@/lib/sync/doctorsSync";
-import AppointmentBookingModal from "@/components/AppointmentBookingModal";
-import AuthModal from "@/components/AuthModal";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { SharedDoctor, getSharedDoctors, deleteSharedDoctor } from "@/lib/sync/doctorsSync";
+import { SharedAppointment, getSharedAppointments, deleteSharedAppointment } from "@/lib/sync/appointmentsSync";
+import { SharedPatient, getSharedPatients, deleteSharedPatient } from "@/lib/sync/patientsSync";
+import { SharedPrescription, getSharedPrescriptions } from "@/lib/sync/prescriptionsSync";
+import { getLiveModuleRecords, deleteLiveModuleRecord, UnifiedRecord } from "@/lib/sync/hospitalMasterSync";
+import AppointmentsView from "@/components/dashboard/shared/AppointmentsView";
+import RegistrationView from "@/components/dashboard/shared/RegistrationView";
+import PrescriptionDispensary from "@/components/dashboard/shared/PrescriptionDispensary";
+import CertificatesView from "@/components/dashboard/shared/CertificatesView";
+import AdminDoctorModal from "@/components/dashboard/admin/AdminDoctorModal";
+import StaffRegistrationModal from "@/components/dashboard/admin/StaffRegistrationModal";
 import {
-  Stethoscope,
-  HeartPulse,
   Activity,
-  ShieldCheck,
-  Phone,
-  Mail,
-  MapPin,
-  Clock,
-  ArrowRight,
+  Users,
+  Calendar,
+  Stethoscope,
+  Pill,
+  BedDouble,
+  Scissors,
+  Scan,
+  FlaskConical,
+  Boxes,
+  Receipt,
+  BarChart3,
+  Wrench,
+  FileCheck,
+  ShieldAlert,
+  RotateCw,
+  Power,
+  Plus,
+  Trash2,
+  Edit2,
+  HeartHandshake,
   UserCheck,
   Building2,
+  Clock,
+  TrendingUp,
+  ShieldCheck,
 } from "lucide-react";
 
-export default function HomePage() {
+export default function AdminDashboardPage() {
+  const router = useRouter();
+
   const [doctors, setDoctors] = useState<SharedDoctor[]>([]);
+  const [appointments, setAppointments] = useState<SharedAppointment[]>([]);
+  const [patients, setPatients] = useState<SharedPatient[]>([]);
+  const [prescriptions, setPrescriptions] = useState<SharedPrescription[]>([]);
+  const [medicalStaff, setMedicalStaff] = useState<UnifiedRecord[]>([]);
+  const [supportStaff, setSupportStaff] = useState<UnifiedRecord[]>([]);
+  const [ledgerRecords, setLedgerRecords] = useState<UnifiedRecord[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [activeTab, setActiveTab] = useState<
+    | "desk"
+    | "doctors"
+    | "medical_staff"
+    | "support_staff"
+    | "appointments"
+    | "registration"
+    | "dispensary"
+    | "ipd"
+    | "ot"
+    | "radiology"
+    | "pathology"
+    | "pharmacy"
+    | "billing"
+    | "analysis"
+    | "utility"
+    | "certificates"
+  >("desk");
+
+  // Search & Modal States
+  const [searchTerm, setSearchTerm] = useState("");
+  const [doctorModalOpen, setDoctorModalOpen] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<SharedDoctor | null>(null);
-  const [isBookingOpen, setIsBookingOpen] = useState(false);
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [loadingDoctors, setLoadingDoctors] = useState(true);
 
-  useEffect(() => {
-    async function fetchDoctors() {
-      try {
-        const liveDoctors = await getSharedDoctors();
-        setDoctors(liveDoctors);
-      } finally {
-        setLoadingDoctors(false);
+  // Staff Registration Modal
+  const [staffModalOpen, setStaffModalOpen] = useState(false);
+  const [staffModalType, setStaffModalType] = useState<"MEDICAL_STAFF" | "SUPPORT_STAFF">("MEDICAL_STAFF");
+
+  const loadData = async () => {
+    setIsSyncing(true);
+    try {
+      const [docData, apptData, patData, rxData, medData, supData] = await Promise.all([
+        getSharedDoctors(),
+        getSharedAppointments(),
+        getSharedPatients(),
+        getSharedPrescriptions(),
+        getLiveModuleRecords("MEDICAL_STAFF"),
+        getLiveModuleRecords("SUPPORT_STAFF"),
+      ]);
+
+      setDoctors(docData);
+      setAppointments(apptData);
+      setPatients(patData);
+      setPrescriptions(rxData);
+      setMedicalStaff(medData);
+      setSupportStaff(supData);
+
+      const moduleMap: Record<string, string> = {
+        ipd: "IPD",
+        ot: "OT",
+        radiology: "RADIOLOGY",
+        pathology: "PATHOLOGY",
+        pharmacy: "STOCK",
+        billing: "BILLING",
+        analysis: "ANALYSIS",
+        utility: "UTILITY",
+      };
+
+      if (moduleMap[activeTab]) {
+        const recs = await getLiveModuleRecords(moduleMap[activeTab]);
+        setLedgerRecords(recs);
       }
+    } finally {
+      setLoading(false);
+      setIsSyncing(false);
     }
-    fetchDoctors();
-  }, []);
-
-  const handleBookDoctor = (doc: SharedDoctor) => {
-    setSelectedDoctor(doc);
-    setIsBookingOpen(true);
   };
 
-  const handleGeneralBooking = () => {
-    setSelectedDoctor(doctors.length > 0 ? doctors[0] : null);
-    setIsBookingOpen(true);
+  useEffect(() => {
+    loadData();
+  }, [activeTab]);
+
+  const handleDeleteAppointment = async (id: string) => {
+    if (!confirm("Are you sure you want to cancel this appointment?")) return;
+    await deleteSharedAppointment(id);
+    loadData();
+  };
+
+  const handleDeleteDoctor = async (id: string) => {
+    if (!confirm("Remove this doctor from the active medical board?")) return;
+    await deleteSharedDoctor(id);
+    loadData();
+  };
+
+  const handleDeleteStaffMember = async (type: "MEDICAL_STAFF" | "SUPPORT_STAFF", id: string) => {
+    if (!confirm("Remove staff credential record?")) return;
+    await deleteLiveModuleRecord(type, id);
+    loadData();
+  };
+
+  const openStaffModal = (type: "MEDICAL_STAFF" | "SUPPORT_STAFF") => {
+    setStaffModalType(type);
+    setStaffModalOpen(true);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      {/* Top Emergency Utility Strip */}
-      <div className="bg-slate-900 text-slate-300 text-[11px] font-medium py-1.5 px-4 sm:px-8 flex justify-between items-center border-b border-slate-800">
-        <div className="flex items-center space-x-4">
-          <span className="flex items-center space-x-1 text-teal-400">
-            <Phone className="w-3 h-3 inline" />
-            <span>Emergency 24/7: +91 0240 2484 000</span>
-          </span>
-          <span className="hidden sm:inline-block text-slate-500">•</span>
-          <span className="hidden sm:inline-block text-slate-400">
-            Hadapsar, Pune, Maharashtra
-          </span>
-        </div>
-        <div className="flex items-center space-x-4">
-          <span className="text-[10px] font-mono tracking-wider bg-teal-950 text-teal-300 px-2 py-0.5 rounded border border-teal-800">
-            DPDP ACT 2023 COMPLIANT NODE
-          </span>
-        </div>
-      </div>
-
-      {/* Main Navigation Bar */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 rounded-xl bg-teal-700 flex items-center justify-center text-white font-black shadow-sm group-hover:bg-teal-800 transition-colors">
-              <Activity className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-base font-black tracking-tight text-slate-900 block leading-tight">
-                GAVANE HOSPITAL
-              </span>
-              <span className="text-[10px] font-bold tracking-widest text-teal-700 uppercase">
-                Care & Clinical Excellence
-              </span>
-            </div>
-          </Link>
-
-          <nav className="hidden md:flex items-center space-x-8 text-xs font-bold uppercase tracking-wider text-slate-600">
-            <a href="#about" className="hover:text-teal-700 transition-colors">
-              About Us
-            </a>
-            <a href="#doctors" className="hover:text-teal-700 transition-colors">
-              Our Specialists
-            </a>
-            <a href="#services" className="hover:text-teal-700 transition-colors">
-              Facilities
-            </a>
-            <a href="#contact" className="hover:text-teal-700 transition-colors">
-              Contact
-            </a>
-          </nav>
-
-          <div className="flex items-center space-x-2">
-            {/* Staff Access Login */}
-            <button
-              onClick={() => setIsAuthOpen(true)}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5"
-            >
-              <span>Staff Login</span>
-            </button>  
-            {/* Patient Portal Login */}
-            <button
-              onClick={() => {
-                setIsAuthOpen(true);
-              }}
-              className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5 shadow-2xs"
-            >
-              <UserCheck className="w-3.5 h-3.5 text-teal-700" />
-              <span>Patient Portal</span>
-            </button>                                 
+    <div className="min-h-screen bg-[#07131b] text-slate-200 flex flex-col font-sans">
+      {/* Top Administrative Header */}
+      <header className="bg-[#050f16] border-b border-slate-800/80 px-6 py-3 flex items-center justify-between z-30 shadow-md">
+        <div className="flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-xl bg-teal-700/80 border border-teal-500/30 flex items-center justify-center text-white font-black shadow-xs">
+            <Activity className="w-5 h-5 text-teal-300" />
           </div>
+          <div>
+            <div className="text-xs font-black tracking-tight text-white uppercase">
+              GAVANE HOSPITAL & RESEARCH CENTRE
+            </div>
+            <div className="text-[10px] text-teal-400 font-bold">
+              • Central Administrative & Medical Governance Desk
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-xl text-xs text-slate-300">
+            <ShieldAlert className="w-3.5 h-3.5 text-teal-400" />
+            <span>
+              Logged as: <strong className="text-white">Hospital Administrator</strong> (admin@gavanehospital.in)
+            </span>
+          </div>
+
+          <button
+            onClick={() => router.push("/")}
+            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer shadow-xs"
+          >
+            <Power className="w-3.5 h-3.5" />
+            <span>Close / Exit</span>
+          </button>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-b from-white via-teal-50/20 to-slate-50 py-16 sm:py-24 border-b border-slate-200 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-6">
-          <div className="inline-flex items-center space-x-2 bg-teal-50 border border-teal-200 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider text-teal-800 shadow-2xs">
-            <HeartPulse className="w-3.5 h-3.5 text-teal-600" />
-            <span>Multi-Specialty Tertiary Healthcare Facility</span>
-          </div>
+      {/* Main Workspace Frame */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Dark Enterprise Sidebar */}
+        <aside className="w-64 bg-[#07131b] border-r border-slate-800/80 flex flex-col justify-between p-3 shrink-0 overflow-y-auto">
+          <div className="space-y-1">
+            <div className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400">
+              ADMINISTRATIVE CONTROL
+            </div>
 
-          <h1 className="text-4xl sm:text-6xl font-black text-slate-950 tracking-tight max-w-4xl mx-auto leading-none">
-            Comprehensive Medical Care Driven by{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-700 to-emerald-600">
-              Clinical Excellence
-            </span>
-          </h1>
-
-          <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto font-medium leading-relaxed">
-            Gavane Hospital & Research Centre brings together board-certified physicians, 
-            cutting-edge diagnostic imaging, round-the-clock emergency triage, and modernized inpatient care.
-          </p>
-
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3.5">
+            {/* MASTER EXECUTIVE DESK BUTTON */}
             <button
-              onClick={handleGeneralBooking}
-              className="w-full sm:w-auto px-7 py-3.5 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center space-x-2"
+              onClick={() => setActiveTab("desk")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "desk"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
             >
-              <span>Schedule Outpatient Consultation</span>
-              <ArrowRight className="w-4 h-4" />
+              <Building2 className="w-4 h-4" />
+              <span>MASTER EXECUTIVE DESK</span>
             </button>
-            <a
-              href="#doctors"
-              className="w-full sm:w-auto px-6 py-3.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-2xl text-xs font-bold transition-all shadow-2xs flex items-center justify-center space-x-2"
+
+            {/* DOCTORS DIRECTORY */}
+            <button
+              onClick={() => setActiveTab("doctors")}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "doctors"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
             >
-              <span>Explore Specialist Directory</span>
-            </a>
+              <div className="flex items-center space-x-2.5">
+                <Stethoscope className="w-4 h-4" />
+                <span>DOCTORS DIRECTORY</span>
+              </div>
+              <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded font-mono">{doctors.length}</span>
+            </button>
+
+            {/* MEDICAL DIRECTORY */}
+            <button
+              onClick={() => setActiveTab("medical_staff")}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "medical_staff"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center space-x-2.5">
+                <HeartHandshake className="w-4 h-4" />
+                <span>MEDICAL DIRECTORY</span>
+              </div>
+              <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded font-mono">{medicalStaff.length}</span>
+            </button>
+
+            {/* SUPPORT DIRECTORY */}
+            <button
+              onClick={() => setActiveTab("support_staff")}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "support_staff"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center space-x-2.5">
+                <UserCheck className="w-4 h-4" />
+                <span>SUPPORT DIRECTORY</span>
+              </div>
+              <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded font-mono">{supportStaff.length}</span>
+            </button>
+
+            {/* ONLINE APPOINTMENTS */}
+            <button
+              onClick={() => setActiveTab("appointments")}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "appointments"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center space-x-2.5">
+                <Calendar className="w-4 h-4" />
+                <span>ONLINE APPOINTMENTS</span>
+              </div>
+              <span className="text-[10px] bg-teal-950 text-teal-300 border border-teal-700/50 px-1.5 py-0.5 rounded font-mono">
+                {appointments.length}
+              </span>
+            </button>
+
+            {/* PATIENT REGISTRATION */}
+            <button
+              onClick={() => setActiveTab("registration")}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "registration"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center space-x-2.5">
+                <Users className="w-4 h-4" />
+                <span>PATIENT REGISTRATION</span>
+              </div>
+              <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded font-mono">{patients.length}</span>
+            </button>
+
+            {/* PRESCRIPTION DISPENSARY */}
+            <button
+              onClick={() => setActiveTab("dispensary")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "dispensary"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Pill className="w-4 h-4" />
+              <span>PRESCRIPTION DISPENSARY</span>
+            </button>
+
+            <div className="pt-2 px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+              HOSPITAL LEDGERS
+            </div>
+
+            <button
+              onClick={() => setActiveTab("ipd")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "ipd" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <BedDouble className="w-4 h-4" />
+              <span>IPD (IN-PATIENT)</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("ot")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "ot" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Scissors className="w-4 h-4" />
+              <span>OT (OPERATION THEATRE)</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("radiology")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "radiology" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Scan className="w-4 h-4" />
+              <span>RADIOLOGY</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("pathology")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "pathology" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <FlaskConical className="w-4 h-4" />
+              <span>PATHOLOGY</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("pharmacy")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "pharmacy" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Boxes className="w-4 h-4" />
+              <span>PHARMACY STOCK</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("billing")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "billing" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Receipt className="w-4 h-4" />
+              <span>BILLING LEDGER</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("analysis")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "analysis" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>ANALYSIS SYSTEM</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("utility")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "utility" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Wrench className="w-4 h-4" />
+              <span>UTILITY</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("certificates")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
+                activeTab === "certificates" ? "bg-teal-600 text-white" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <FileCheck className="w-4 h-4" />
+              <span>CERTIFICATES</span>
+            </button>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto pt-10 text-left">
-            <div className="bg-white/80 backdrop-blur-xs p-4 rounded-2xl border border-slate-200 shadow-2xs">
-              <div className="text-2xl font-black text-slate-900">24/7</div>
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Emergency Triage</div>
+          <div className="pt-4 border-t border-slate-800/60 text-[10px] text-slate-400 space-y-0.5">
+            <div className="font-bold text-slate-300">SHOURYA TECHNOLOGIES</div>
+            <div>Hadapsar, Pune, Maharashtra.</div>
+            <div>Contact: +91 9860043213</div>
+          </div>
+        </aside>
+
+        {/* Right Main Body */}
+        <main className="flex-1 bg-slate-100 p-6 overflow-y-auto">
+          {/* Top Status Bar */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 mb-5 flex items-center justify-between shadow-2xs">
+            <div className="flex items-center space-x-2 text-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-bold text-slate-700">
+                Live Node: <strong className="text-teal-700 font-mono">Supabase DB Cluster</strong>
+              </span>
+              <span className="text-slate-400">•</span>
+              <span className="text-slate-500">
+                Registered Specialists: <strong>{doctors.length}</strong>
+              </span>
             </div>
-            <div className="bg-white/80 backdrop-blur-xs p-4 rounded-2xl border border-slate-200 shadow-2xs">
-              <div className="text-2xl font-black text-teal-700">{doctors.length}+ Specialists</div>
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Medical Board</div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-xs p-4 rounded-2xl border border-slate-200 shadow-2xs">
-              <div className="text-2xl font-black text-slate-900">100%</div>
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Paperless OPD EHR</div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-xs p-4 rounded-2xl border border-slate-200 shadow-2xs">
-              <div className="text-2xl font-black text-emerald-600">NABH</div>
-              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Standard Compliance</div>
+
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={loadData}
+                disabled={isSyncing}
+                className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs"
+              >
+                <RotateCw className={`w-3.5 h-3.5 text-teal-600 ${isSyncing ? "animate-spin" : ""}`} />
+                <span>Sync Live</span>
+              </button>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Specialist Doctors Section */}
-      <section id="doctors" className="py-16 sm:py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-        <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
-          <span className="text-[10px] font-black uppercase text-teal-700 tracking-widest bg-teal-50 border border-teal-200 px-3 py-1 rounded-full">
-            Medical Board
-          </span>
-          <h2 className="text-3xl font-black text-slate-950 tracking-tight">
-            Our Specialist Doctors
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 font-medium">
-            Board-certified clinicians offering multidisciplinary outpatient consultations and surgery.
-          </p>
-        </div>
-
-        {loadingDoctors ? (
-          <div className="py-16 text-center text-xs font-bold text-slate-400">
-            Fetching active specialists from Supabase cluster...
-          </div>
-        ) : doctors.length === 0 ? (
-          <div className="py-12 text-center text-xs font-semibold text-slate-400 italic bg-white border border-slate-200 rounded-2xl">
-            No specialists listed in the database yet.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {doctors.map((doc) => {
-              const displayName = doc.name.replace(/^Dr\.?\s*/i, "");
-              const firstName = displayName.split(" ")[0] || displayName;
-
-              return (
-                <div
-                  key={doc.id}
-                  className="bg-white border border-slate-200 rounded-3xl p-6 text-center shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group"
-                >
-                  <div className="space-y-3 flex flex-col items-center">
-                    <img
-                      src={doc.image || "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80"}
-                      alt={doc.name}
-                      className="w-24 h-24 rounded-2xl object-cover border-2 border-teal-600 shadow-xs bg-slate-100 group-hover:scale-105 transition-transform"
-                    />
-                    <div>
-                      <h3 className="text-base font-black text-slate-900 leading-tight">
-                        {doc.name.startsWith("Dr.") ? doc.name : `Dr. ${doc.name}`}
-                      </h3>
-                      <p className="text-[11px] font-bold text-slate-500 mt-0.5">
-                        {doc.degree}
-                      </p>
-                    </div>
-
-                    <span className="inline-block text-[10px] font-extrabold uppercase tracking-wider text-teal-800 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200">
-                      {doc.department}
-                    </span>
-
-                    <p className="text-xs font-mono font-bold text-slate-700">
-                      OPD Fee: <span className="text-teal-700 font-extrabold">{doc.fee || "₹500"}</span>
-                    </p>
+          {/* VIEW: MASTER EXECUTIVE DESK */}
+          {activeTab === "desk" && (
+            <div className="space-y-6">
+              {/* Executive Overview KPI Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider">Medical Board</span>
+                    <Stethoscope className="w-4 h-4 text-teal-600" />
                   </div>
+                  <div className="text-2xl font-black text-slate-900">{doctors.length} Specialists</div>
+                  <p className="text-[11px] text-teal-700 font-semibold">Active Credentialed Doctors</p>
+                </div>
 
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider">Clinical Staff</span>
+                    <HeartHandshake className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div className="text-2xl font-black text-slate-900">{medicalStaff.length} Officers</div>
+                  <p className="text-[11px] text-blue-700 font-semibold">RMOs & Nursing Staff</p>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider">Support Operations</span>
+                    <UserCheck className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div className="text-2xl font-black text-slate-900">{supportStaff.length} Personnel</div>
+                  <p className="text-[11px] text-amber-700 font-semibold">Billing, OT, Pharmacy & Triage</p>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider">Online Appointments</span>
+                    <Calendar className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="text-2xl font-black text-slate-900">{appointments.length} Consultations</div>
+                  <p className="text-[11px] text-emerald-700 font-semibold">Live Web Bookings</p>
+                </div>
+              </div>
+
+              {/* Quick Operation Buttons */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  Executive Fast Actions
+                </h3>
+                <div className="flex flex-wrap gap-3">
                   <button
-                    type="button"
-                    onClick={() => handleBookDoctor(doc)}
-                    className="w-full py-2.5 bg-slate-900 hover:bg-teal-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow-2xs cursor-pointer"
+                    onClick={() => {
+                      setSelectedDoctor(null);
+                      setDoctorModalOpen(true);
+                    }}
+                    className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center space-x-1.5 cursor-pointer"
                   >
-                    Book with {firstName}
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Add Specialist Doctor</span>
+                  </button>
+                  <button
+                    onClick={() => openStaffModal("MEDICAL_STAFF")}
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <HeartHandshake className="w-3.5 h-3.5 text-teal-400" />
+                    <span>+ Register Medical Officer</span>
+                  </button>
+                  <button
+                    onClick={() => openStaffModal("SUPPORT_STAFF")}
+                    className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <UserCheck className="w-3.5 h-3.5 text-teal-600" />
+                    <span>+ Register Support Staff</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("appointments")}
+                    className="px-4 py-2 bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-800 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-teal-700" />
+                    <span>Manage Outpatient Bookings</span>
                   </button>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* Facilities & Services Section */}
-      <section id="services" className="py-16 bg-slate-100/70 border-y border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
-            <span className="text-[10px] font-black uppercase text-teal-700 tracking-widest bg-teal-50 border border-teal-200 px-3 py-1 rounded-full">
-              Clinical Infrastructure
-            </span>
-            <h2 className="text-3xl font-black text-slate-950 tracking-tight">
-              Hospital Facilities & Departments
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium">
-              Equipped with modern surgical, diagnostic, and emergency infrastructure.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xs space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700">
-                <Stethoscope className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-black text-slate-900">Modern Operation Theatres (OT)</h3>
-              <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                HEPA-filtered laminar airflow surgical suites outfitted for minimally invasive laparoscopy, trauma repair, and emergency procedures.
-              </p>
-            </div>
 
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xs space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700">
-                <Activity className="w-6 h-6" />
+              {/* Recent Consultation Schedule Preview */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">Recent Consultation Schedule</h3>
+                    <p className="text-xs text-slate-500">Live feed of incoming outpatient bookings.</p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab("appointments")}
+                    className="text-xs font-bold text-teal-700 hover:underline cursor-pointer"
+                  >
+                    View All {appointments.length} Appointments →
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                      <tr>
+                        <th className="py-2.5 px-3">Ref ID</th>
+                        <th className="py-2.5 px-3">Patient Name</th>
+                        <th className="py-2.5 px-3">Assigned Physician</th>
+                        <th className="py-2.5 px-3">Scheduled Date</th>
+                        <th className="py-2.5 px-3">Time Slot</th>
+                        <th className="py-2.5 px-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                      {appointments.slice(0, 5).map((a) => (
+                        <tr key={a.id || a.reference_id} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-2.5 px-3 font-mono font-bold text-teal-800">{a.reference_id}</td>
+                          <td className="py-2.5 px-3 font-bold text-slate-900">{a.patient_name}</td>
+                          <td className="py-2.5 px-3 text-slate-700">{a.assigned_doctor}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-600">{a.appointment_date}</td>
+                          <td className="py-2.5 px-3 font-mono text-teal-700 font-bold">{a.time_slot}</td>
+                          <td className="py-2.5 px-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              {a.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <h3 className="text-base font-black text-slate-900">Digital Radiology & Pathology</h3>
-              <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                High-resolution ultrasound, digital X-Ray imaging, and automated clinical laboratories integrated directly with outpatient electronic health records.
-              </p>
             </div>
+          )}
 
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xs space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700">
-                <ShieldCheck className="w-6 h-6" />
+          {/* ONLINE APPOINTMENTS VIEW */}
+          {activeTab === "appointments" && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <AppointmentsView
+                appointments={appointments}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                onDeleteAppointment={handleDeleteAppointment}
+                onRefresh={loadData}
+              />
+            </div>
+          )}
+
+          {/* DOCTORS DIRECTORY */}
+          {activeTab === "doctors" && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Hospital Medical Board Directory</h3>
+                  <p className="text-xs text-slate-500">Manage credentialed consultants, credentials, and fee structures.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedDoctor(null);
+                    setDoctorModalOpen(true);
+                  }}
+                  className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Add Doctor</span>
+                </button>
               </div>
-              <h3 className="text-base font-black text-slate-900">Inpatient & Critical Care (IPD)</h3>
-              <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                Continuous multipara telemetry monitoring, intensive care beds, and compassionate bedside nursing protocol 24 hours a day.
-              </p>
+
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                    <tr>
+                      <th className="py-2.5 px-3">Ref ID</th>
+                      <th className="py-2.5 px-3">Doctor Profile</th>
+                      <th className="py-2.5 px-3">Department</th>
+                      <th className="py-2.5 px-3">Official Email</th>
+                      <th className="py-2.5 px-3">OPD Fee</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3 text-right">Controls</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                    {doctors.map((doc) => (
+                      <tr key={doc.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-2.5 px-3 font-mono text-teal-800 font-bold">{doc.reference_id}</td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center space-x-2">
+                          <img src={doc.image} alt={doc.name} className="w-7 h-7 rounded-full object-cover border border-teal-600" />
+                          <span>{doc.name}</span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600">{doc.department}</td>
+                        <td className="py-2.5 px-3 font-mono text-slate-500">{doc.email}</td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-teal-700">{doc.fee}</td>
+                        <td className="py-2.5 px-3">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {doc.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <div className="flex items-center justify-end space-x-1">
+                            <button
+                              onClick={() => {
+                                setSelectedDoctor(doc);
+                                setDoctorModalOpen(true);
+                              }}
+                              className="p-1 text-slate-400 hover:text-teal-600 rounded"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDoctor(doc.id)}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        </div>
-      </section>
+          )}
 
-      {/* Hospital Footer */}
-      <footer id="contact" className="bg-slate-950 text-slate-400 text-xs mt-auto border-t border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2 text-white">
-              <Building2 className="w-5 h-5 text-teal-500" />
-              <span className="font-black text-sm tracking-tight">GAVANE HOSPITAL</span>
+          {/* MEDICAL DIRECTORY */}
+          {activeTab === "medical_staff" && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Clinical & Medical Officer Directory</h3>
+                  <p className="text-xs text-slate-500">Resident Medical Officers (RMO), Clinical Specialists, and Nursing Superintendents.</p>
+                </div>
+                <button
+                  onClick={() => openStaffModal("MEDICAL_STAFF")}
+                  className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Register Medical Staff</span>
+                </button>
+              </div>
+
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                    <tr>
+                      <th className="py-2.5 px-3">Credential Ref</th>
+                      <th className="py-2.5 px-3">Clinician Name</th>
+                      <th className="py-2.5 px-3">Designation / Ward</th>
+                      <th className="py-2.5 px-3">Contact</th>
+                      <th className="py-2.5 px-3">Registration No.</th>
+                      <th className="py-2.5 px-3">Shift Timing</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3 text-right">Controls</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                    {medicalStaff.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-8 text-center text-slate-400 text-xs italic">
+                          No medical officers recorded yet. Click "+ Register Medical Staff" to add clinicians.
+                        </td>
+                      </tr>
+                    ) : (
+                      medicalStaff.map((staff) => (
+                        <tr key={staff.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-2.5 px-3 font-mono font-bold text-teal-800">{staff.reference_id}</td>
+                          <td className="py-2.5 px-3 font-bold text-slate-900">{staff.col1}</td>
+                          <td className="py-2.5 px-3 text-teal-700 font-semibold">{staff.col2}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-600">{staff.col3}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-500">{staff.col4 || "-"}</td>
+                          <td className="py-2.5 px-3 text-slate-500">{staff.col5 || "Day Shift"}</td>
+                          <td className="py-2.5 px-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              {staff.status}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              onClick={() => handleDeleteStaffMember("MEDICAL_STAFF", staff.id)}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <p className="text-slate-500 text-[11px] leading-relaxed">
-              Dedicated to compassionate, ethical, and clinically rigorous healthcare delivery in Pune and surrounding regions.
-            </p>
-          </div>
+          )}
 
-          <div>
-            <h4 className="font-bold text-white text-xs uppercase tracking-wider mb-3">Quick Navigation</h4>
-            <ul className="space-y-2 text-[11px]">
-              <li><a href="#about" className="hover:text-teal-400 transition-colors">About Facility</a></li>
-              <li><a href="#doctors" className="hover:text-teal-400 transition-colors">Specialist Medical Board</a></li>
-              <li><a href="#services" className="hover:text-teal-400 transition-colors">Clinical Diagnostic Labs</a></li>
-              <li><button onClick={() => setIsAuthOpen(true)} className="hover:text-teal-400 transition-colors cursor-pointer">Staff Access Gateway</button></li>
-            </ul>
-          </div>
+          {/* SUPPORT DIRECTORY */}
+          {activeTab === "support_staff" && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">Hospital Support & Operations Directory</h3>
+                  <p className="text-xs text-slate-500">Reception triage, billing officers, OT technicians, and ward assistants.</p>
+                </div>
+                <button
+                  onClick={() => openStaffModal("SUPPORT_STAFF")}
+                  className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Register Support Staff</span>
+                </button>
+              </div>
 
-          <div>
-            <h4 className="font-bold text-white text-xs uppercase tracking-wider mb-3">Contact Desk</h4>
-            <ul className="space-y-2 text-[11px]">
-              <li className="flex items-center space-x-2"><Phone className="w-3.5 h-3.5 text-teal-500" /><span>+91 0240 2484 000</span></li>
-              <li className="flex items-center space-x-2"><Mail className="w-3.5 h-3.5 text-teal-500" /><span>care@gavanehospital.in</span></li>
-              <li className="flex items-center space-x-2"><MapPin className="w-3.5 h-3.5 text-teal-500" /><span>Hadapsar, Pune, MH</span></li>
-            </ul>
-          </div>
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                    <tr>
+                      <th className="py-2.5 px-3">Credential Ref</th>
+                      <th className="py-2.5 px-3">Staff Member</th>
+                      <th className="py-2.5 px-3">Position / Department</th>
+                      <th className="py-2.5 px-3">Contact</th>
+                      <th className="py-2.5 px-3">Employee ID</th>
+                      <th className="py-2.5 px-3">Shift Timing</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3 text-right">Controls</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                    {supportStaff.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-8 text-center text-slate-400 text-xs italic">
+                          No support staff recorded yet. Click "+ Register Support Staff" to add personnel.
+                        </td>
+                      </tr>
+                    ) : (
+                      supportStaff.map((staff) => (
+                        <tr key={staff.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-2.5 px-3 font-mono font-bold text-teal-800">{staff.reference_id}</td>
+                          <td className="py-2.5 px-3 font-bold text-slate-900">{staff.col1}</td>
+                          <td className="py-2.5 px-3 text-slate-700 font-semibold">{staff.col2}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-600">{staff.col3}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-500">{staff.col4 || "-"}</td>
+                          <td className="py-2.5 px-3 text-slate-500">{staff.col5 || "Day Shift"}</td>
+                          <td className="py-2.5 px-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              {staff.status}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              onClick={() => handleDeleteStaffMember("SUPPORT_STAFF", staff.id)}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
-          <div>
-            <h4 className="font-bold text-white text-xs uppercase tracking-wider mb-3">Compliance & Governance</h4>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Digital Personal Data Protection (DPDP) Act 2023 compliant encrypted node. All clinical health records are strictly authenticated.
-            </p>
-          </div>
-        </div>
+          {/* PATIENT REGISTRATION */}
+          {activeTab === "registration" && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <RegistrationView
+                patients={patients}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                onOpenEditPatient={() => {}}
+                onDeletePatient={async (id) => {
+                  if (confirm("Delete patient record?")) {
+                    await deleteSharedPatient(id);
+                    loadData();
+                  }
+                }}
+              />
+            </div>
+          )}
 
-        <div className="border-t border-slate-900 py-4 px-4 text-center text-[10px] text-slate-600">
-          © {new Date().getFullYear()} Gavane Hospital & Research Centre. Engineered by Shourya Technologies. All rights reserved.
-        </div>
-      </footer>
+          {/* PRESCRIPTION DISPENSARY */}
+          {activeTab === "dispensary" && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <PrescriptionDispensary
+                prescriptions={prescriptions}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                onDispense={() => {}}
+              />
+            </div>
+          )}
 
-      {/* Outpatient Appointment Booking Modal */}
-      <AppointmentBookingModal
-        isOpen={isBookingOpen}
-        selectedDoctor={selectedDoctor}
-        onClose={() => {
-          setIsBookingOpen(false);
-          setSelectedDoctor(null);
-        }}
-      />
+          {/* CERTIFICATES */}
+          {activeTab === "certificates" && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              {React.createElement(CertificatesView as any, {
+                doctorName: "Hospital Medical Superintendent",
+                doctorId: "admin",
+              })}
+            </div>
+          )}
+        </main>
+      </div>
 
-      {/* Staff Authentication Modal */}
-      <AuthModal
-        isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
-      />
+      {/* Admin Doctor Modal */}
+      {doctorModalOpen && (
+        <AdminDoctorModal
+          isOpen={doctorModalOpen}
+          doctor={selectedDoctor}
+          onClose={() => setDoctorModalOpen(false)}
+          onSaved={loadData}
+        />
+      )}
+
+      {/* Medical & Support Staff Registration Modal */}
+      {staffModalOpen && (
+        <StaffRegistrationModal
+          isOpen={staffModalOpen}
+          type={staffModalType}
+          onClose={() => setStaffModalOpen(false)}
+          onSuccess={loadData}
+        />
+      )}
     </div>
   );
 }
