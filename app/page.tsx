@@ -102,6 +102,13 @@ export default function HomePage() {
           </nav>
 
           <div className="flex items-center space-x-2">
+            {/* Staff Access Login */}
+            <button
+              onClick={() => setIsAuthOpen(true)}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5"
+            >
+              <span>Staff Login</span>
+            </button>  
             {/* Patient Portal Login */}
             <button
               onClick={() => {
@@ -111,23 +118,7 @@ export default function HomePage() {
             >
               <UserCheck className="w-3.5 h-3.5 text-teal-700" />
               <span>Patient Portal</span>
-            </button>
-
-            {/* Staff Access Login */}
-            <button
-              onClick={() => setIsAuthOpen(true)}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center space-x-1.5"
-            >
-              <span>Staff Login</span>
-            </button>
-
-            {/* Book Outpatient Visit */}
-            <button
-              onClick={handleGeneralBooking}
-              className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-extrabold uppercase tracking-wider rounded-xl shadow-sm transition-all cursor-pointer"
-            >
-              Book OPD
-            </button>
+            </button>                                 
           </div>
         </div>
       </header>
