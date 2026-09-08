@@ -34,7 +34,6 @@ function LandingPageContent() {
     }
     loadDoctors();
 
-    // Check if user was redirected to login with query param
     const loginQuery = searchParams.get("login");
     if (loginQuery && ["admin", "doctor", "medical", "support"].includes(loginQuery)) {
       setAuthRole(loginQuery as any);
@@ -54,7 +53,7 @@ function LandingPageContent() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans">
-      {/* Top Notification / Emergency Bar */}
+      {/* Top Banner */}
       <div className="bg-slate-900 text-slate-300 text-xs px-6 py-2 flex flex-wrap items-center justify-between border-b border-slate-800">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-1.5">

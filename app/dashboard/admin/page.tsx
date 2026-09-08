@@ -242,7 +242,7 @@ export default function AdminDashboardPage() {
               ADMINISTRATIVE CONTROL
             </div>
 
-            {/* 1. MASTER EXECUTIVE DESK */}
+            {/* 1. MASTER EXECUTIVE DESK (Placed at the top) */}
             <button
               onClick={() => setActiveTab("desk")}
               className={`w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
