@@ -39,9 +39,12 @@ export default function AppointmentBookingModal({
   const [timeSlot, setTimeSlot] = useState(TIME_SLOTS[0]);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
-  // 1. Fetch live doctors from database
+  // 1. Fetch live active doctors from Supabase
   useEffect(() => {
     async function loadDoctors() {
       const data = await getSharedDoctors();
@@ -52,18 +55,18 @@ export default function AppointmentBookingModal({
     }
   }, [isOpen]);
 
-  // 2. Set initial chosen doctor when modal opens or selectedDoctor changes
+  // 2. Synchronize selected doctor on modal open or doctor switch
   useEffect(() => {
     if (selectedDoctor?.id) {
       setChosenDoctorId(selectedDoctor.id);
     } else if (doctorsList.length > 0 && !chosenDoctorId) {
       setChosenDoctorId(doctorsList[0].id);
     }
-  }, [selectedDoctor, doctorsList]);
+  }, [selectedDoctor, doctorsList, chosenDoctorId]);
 
   if (!isOpen) return null;
 
-  // The active doctor is strictly whatever the dropdown currently has selected
+  // Active doctor derived directly from the current dropdown selection
   const activeDoctor =
     doctorsList.find((d) => d.id === chosenDoctorId) || selectedDoctor || doctorsList[0];
 
@@ -76,7 +79,7 @@ export default function AppointmentBookingModal({
     const doctorDepartment = activeDoctor?.department || "General Medicine";
 
     try {
-      // 1. Save directly to public.appointments
+      // 1. Write outpatient record to public.appointments
       await saveSharedAppointment({
         patient_name: patientName.trim(),
         phone: phone.trim(),
@@ -85,11 +88,11 @@ export default function AppointmentBookingModal({
         doctor_id: activeDoctor?.id,
         appointment_date: appointmentDate,
         time_slot: timeSlot,
-        reason: reason.trim() || "Consultation",
+        reason: reason.trim() || "OPD Consultation",
         status: "Confirmed",
       });
 
-      // 2. Automatically register / assign patient to doctor's active caseload
+      // 2. Register / link patient to doctor's clinical caseload in public.patients
       await saveSharedPatient({
         full_name: patientName.trim(),
         phone: phone.trim(),
@@ -112,10 +115,18 @@ export default function AppointmentBookingModal({
         onClose();
         if (onSuccess) onSuccess();
       }, 1500);
-    } catch {
+    } catch (err: unknown) {
+      console.error("Booking error details:", err);
+      const detail =
+        err instanceof Error
+          ? err.message
+          : typeof err === "object" && err !== null && "message" in err
+          ? (err as { message: string }).message
+          : JSON.stringify(err);
+
       setStatusMessage({
         type: "error",
-        text: "Failed to confirm appointment. Please verify connection.",
+        text: `Failed: ${detail}`,
       });
     } finally {
       setSubmitting(false);
@@ -147,7 +158,7 @@ export default function AppointmentBookingModal({
 
         {statusMessage && (
           <div
-            className={`p-3 rounded-xl text-xs font-bold ${
+            className={`p-3 rounded-xl text-xs font-bold whitespace-pre-wrap break-all ${
               statusMessage.type === "success"
                 ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
                 : "bg-rose-50 border border-rose-200 text-rose-700"
@@ -276,9 +287,9 @@ export default function AppointmentBookingModal({
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
+              className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition-all cursor-pointer flex items-center space-x-1"
             >
-              {submitting ? "Confirming..." : `Confirm Booking with ${activeDoctor?.name || "Doctor"}`}
+              <span>{submitting ? "Confirming..." : `Confirm Booking with ${activeDoctor?.name || "Doctor"}`}</span>
             </button>
           </div>
         </form>
