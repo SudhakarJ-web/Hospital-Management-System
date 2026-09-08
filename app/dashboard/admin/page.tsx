@@ -37,10 +37,15 @@ import {
   HeartHandshake,
   UserCheck,
   Building2,
+  Lock,
 } from "lucide-react";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
+
+  // Auth Guard States
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   const [doctors, setDoctors] = useState<SharedDoctor[]>([]);
   const [appointments, setAppointments] = useState<SharedAppointment[]>([]);
@@ -50,7 +55,6 @@ export default function AdminDashboardPage() {
   const [supportStaff, setSupportStaff] = useState<UnifiedRecord[]>([]);
   const [ledgerRecords, setLedgerRecords] = useState<UnifiedRecord[]>([]);
 
-  const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [activeTab, setActiveTab] = useState<
     | "desk"
@@ -79,6 +83,22 @@ export default function AdminDashboardPage() {
   // Staff Registration Modal
   const [staffModalOpen, setStaffModalOpen] = useState(false);
   const [staffModalType, setStaffModalType] = useState<"MEDICAL_STAFF" | "SUPPORT_STAFF">("MEDICAL_STAFF");
+
+  // Session Authentication Guard
+  useEffect(() => {
+    const role = sessionStorage.getItem("staff_role");
+    const email = sessionStorage.getItem("staff_email");
+
+    if (role !== "admin" || email !== "admin@gavanehospital.in") {
+      setIsAuthorized(false);
+      setCheckingAuth(false);
+      router.replace("/?login=admin");
+      return;
+    }
+
+    setIsAuthorized(true);
+    setCheckingAuth(false);
+  }, [router]);
 
   const loadData = async () => {
     setIsSyncing(true);
@@ -115,14 +135,21 @@ export default function AdminDashboardPage() {
         setLedgerRecords(recs);
       }
     } finally {
-      setLoading(false);
       setIsSyncing(false);
     }
   };
 
   useEffect(() => {
-    loadData();
-  }, [activeTab]);
+    if (isAuthorized) {
+      loadData();
+    }
+  }, [isAuthorized, activeTab]);
+
+  const handleExit = () => {
+    sessionStorage.removeItem("staff_role");
+    sessionStorage.removeItem("staff_email");
+    router.push("/");
+  };
 
   const handleDeleteAppointment = async (id: string) => {
     if (!confirm("Are you sure you want to cancel this appointment?")) return;
@@ -146,6 +173,29 @@ export default function AdminDashboardPage() {
     setStaffModalType(type);
     setStaffModalOpen(true);
   };
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-[#07131b] flex items-center justify-center text-white text-xs font-bold font-sans">
+        Verifying Administrator Access Credentials...
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-[#07131b] flex flex-col items-center justify-center text-white space-y-3 font-sans">
+        <Lock className="w-8 h-8 text-rose-500" />
+        <h2 className="text-sm font-black">Access Denied: Unauthenticated Administrator</h2>
+        <button
+          onClick={() => router.push("/?login=admin")}
+          className="px-4 py-2 bg-teal-600 rounded-xl text-xs font-bold cursor-pointer"
+        >
+          Login via Staff Portal
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#07131b] text-slate-200 flex flex-col font-sans">
@@ -174,7 +224,7 @@ export default function AdminDashboardPage() {
           </div>
 
           <button
-            onClick={() => router.push("/")}
+            onClick={handleExit}
             className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer shadow-xs"
           >
             <Power className="w-3.5 h-3.5" />
@@ -192,7 +242,7 @@ export default function AdminDashboardPage() {
               ADMINISTRATIVE CONTROL
             </div>
 
-            {/* 1. MASTER EXECUTIVE DESK (Placed at the very top) */}
+            {/* 1. MASTER EXECUTIVE DESK */}
             <button
               onClick={() => setActiveTab("desk")}
               className={`w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
@@ -471,7 +521,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Executive Fast Actions */}
+              {/* Fast Actions */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
                 <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
                   Executive Fast Actions
@@ -511,7 +561,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Recent Consultation Schedule Preview */}
+              {/* Consultation Schedule Preview */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
                 <div className="flex items-center justify-between">
                   <div>

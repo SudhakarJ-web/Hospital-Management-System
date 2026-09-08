@@ -31,6 +31,7 @@ import {
   Power,
   Plus,
   Trash2,
+  Lock,
 } from "lucide-react";
 
 interface DoctorSlugProps {
@@ -49,6 +50,7 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
   const [ledgerRecords, setLedgerRecords] = useState<UnifiedRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   // Active Sidebar View
   const [activeView, setActiveView] = useState<
@@ -68,6 +70,26 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
   >("opd");
 
   const [notification, setNotification] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    // 1. Session verification check
+    const role = sessionStorage.getItem("staff_role");
+    const sessionEmail = sessionStorage.getItem("staff_email");
+    const sessionDoctorSlug = sessionStorage.getItem("doctor_slug");
+
+    // Allow Admin or the specific logged-in Doctor
+    const isAdmin = role === "admin";
+    const isThisDoctor = role === "doctor" && (sessionDoctorSlug === doctorSlug || sessionEmail);
+
+    if (!isAdmin && !isThisDoctor) {
+      setIsAuthorized(false);
+      setLoading(false);
+      router.replace("/?login=doctor");
+      return;
+    }
+
+    setIsAuthorized(true);
+  }, [doctorSlug, router]);
 
   const loadAllData = async () => {
     setIsSyncing(true);
@@ -97,7 +119,6 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
       setAllPrescriptions(rxData);
       setAllAppointments(apptData);
 
-      // Load ledger records if active view is a clinical ledger
       const moduleMap: Record<string, string> = {
         pharmacy: "STOCK",
         ipd: "IPD",
@@ -122,10 +143,17 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
   };
 
   useEffect(() => {
-    if (doctorSlug) {
+    if (isAuthorized && doctorSlug) {
       loadAllData();
     }
-  }, [doctorSlug, activeView]);
+  }, [isAuthorized, doctorSlug, activeView]);
+
+  const handleExit = () => {
+    sessionStorage.removeItem("staff_role");
+    sessionStorage.removeItem("staff_email");
+    sessionStorage.removeItem("doctor_slug");
+    router.push("/");
+  };
 
   if (loading) {
     return (
@@ -138,9 +166,24 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
     );
   }
 
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-[#07131b] flex flex-col items-center justify-center text-white space-y-3 font-sans">
+        <Lock className="w-8 h-8 text-rose-500" />
+        <h2 className="text-sm font-black">Access Denied: Unauthenticated Physician Session</h2>
+        <button
+          onClick={() => router.push("/?login=doctor")}
+          className="px-4 py-2 bg-teal-600 rounded-xl text-xs font-bold cursor-pointer"
+        >
+          Login via Doctor Desk
+        </button>
+      </div>
+    );
+  }
+
   if (!activeDoctor) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-4 space-y-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-4 space-y-4 font-sans">
         <p className="text-sm font-bold text-rose-400">Doctor account could not be resolved from URL.</p>
         <button
           onClick={() => router.push("/")}
@@ -152,7 +195,6 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
     );
   }
 
-  // Filter dedicated patient caseload and appointments for this physician
   const myPatients = allPatients.filter(
     (p) =>
       (p.doctor_id && p.doctor_id === activeDoctor.id) ||
@@ -165,7 +207,6 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
       (a.assigned_doctor && a.assigned_doctor.toLowerCase().includes(activeDoctor.name.toLowerCase()))
   );
 
-  // Quick ledger entry addition
   const handleAddLedgerRow = async () => {
     const moduleKey = activeView === "pharmacy" ? "STOCK" : activeView.toUpperCase();
     const itemTitle = prompt(`Enter new entry title for ${moduleKey}:`);
@@ -197,7 +238,7 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
 
   return (
     <div className="min-h-screen bg-[#07131b] text-slate-200 flex flex-col font-sans">
-      {/* Top Main Dark Navbar */}
+      {/* Top Header */}
       <header className="bg-[#050f16] border-b border-slate-800/80 px-6 py-3 flex items-center justify-between z-30 shadow-md">
         <div className="flex items-center space-x-3">
           <div className="w-9 h-9 rounded-xl bg-teal-700/80 border border-teal-500/30 flex items-center justify-center text-white font-black shadow-xs">
@@ -222,7 +263,7 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
           </div>
 
           <button
-            onClick={() => router.push("/")}
+            onClick={handleExit}
             className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer shadow-xs"
           >
             <Power className="w-3.5 h-3.5" />
@@ -231,14 +272,9 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
         </div>
       </header>
 
-      {/* Sub-header ticker bar */}
-      <div className="bg-[#040b10] border-b border-slate-800/50 py-1 text-center text-[10px] tracking-widest text-teal-400 uppercase font-bold">
-        PHYSICIAN CLINICAL EHR & OUTPATIENT OPERATIONS WORKSPACE
-      </div>
-
-      {/* Main Workspace Frame */}
+      {/* Workspace Frame */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Dark Enterprise Sidebar */}
+        {/* Left Dark Sidebar */}
         <aside className="w-64 bg-[#07131b] border-r border-slate-800/80 flex flex-col justify-between p-3 shrink-0 overflow-y-auto">
           <div className="space-y-1">
             <div className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400">
@@ -407,9 +443,9 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
           </div>
         </aside>
 
-        {/* Right Main Body */}
+        {/* Right Body */}
         <main className="flex-1 bg-slate-100 p-6 overflow-y-auto">
-          {/* Sub-header Strip */}
+          {/* Subheader */}
           <div className="bg-white rounded-2xl border border-slate-200/80 p-4 mb-5 flex items-center justify-between shadow-2xs">
             <div className="flex items-center space-x-2 text-xs">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -527,7 +563,7 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
             </div>
           )}
 
-          {/* VIEW: Clinical Departmental Ledgers */}
+          {/* Clinical Ledgers */}
           {["ipd", "ot", "radiology", "pathology", "pharmacy", "billing", "analysis", "utility"].includes(
             activeView
           ) && (
@@ -599,7 +635,7 @@ export default function DoctorSlugDashboard({ params }: DoctorSlugProps) {
             </div>
           )}
 
-          {/* VIEW: Medical Certificates */}
+          {/* Medical Certificates */}
           {activeView === "certificates" && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
               {React.createElement(CertificatesView as any, {

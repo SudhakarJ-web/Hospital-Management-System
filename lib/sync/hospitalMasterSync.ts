@@ -2,99 +2,96 @@ import { supabase } from "@/lib/supabase";
 
 export interface UnifiedRecord {
   id: string;
+  module: string;
   reference_id: string;
-  col1: string; // Title / Subject / Name
+  col1: string;
   col2?: string;
   col3?: string;
   col4?: string;
   col5?: string;
   status: string;
   doctor_id?: string;
-  created_at: string;
+  created_at?: string;
 }
 
-export async function getLiveModuleRecords(moduleName: string): Promise<UnifiedRecord[]> {
+export async function getLiveModuleRecords(moduleKey: string): Promise<UnifiedRecord[]> {
   try {
     const { data, error } = await supabase
       .from("clinical_ledgers")
       .select("*")
-      .eq("module", moduleName)
+      .eq("module", moduleKey.toUpperCase())
       .order("created_at", { ascending: false });
 
     if (error || !data) {
+      console.error(`Error fetching ledger ${moduleKey}:`, error);
       return [];
     }
 
-    return data.map((item) => ({
-      id: item.id,
-      reference_id: item.reference_id,
-      col1: item.col1,
-      col2: item.col2,
-      col3: item.col3,
-      col4: item.col4,
-      col5: item.col5,
-      status: item.status,
-      doctor_id: item.doctor_id,
-      created_at: item.created_at,
+    return data.map((row) => ({
+      id: row.id,
+      module: row.module,
+      reference_id: row.reference_id || `GH-${row.id?.slice(0, 5)}`,
+      col1: row.col1 || "",
+      col2: row.col2 || "",
+      col3: row.col3 || "",
+      col4: row.col4 || "",
+      col5: row.col5 || "",
+      status: row.status || "Active",
+      doctor_id: row.doctor_id,
+      created_at: row.created_at,
     }));
-  } catch {
+  } catch (err) {
+    console.error(`Ledger query failure on ${moduleKey}:`, err);
     return [];
   }
 }
 
 export async function saveLiveModuleRecord(
-  moduleName: string,
+  moduleKey: string,
   record: Partial<UnifiedRecord>
-): Promise<UnifiedRecord[]> {
-  try {
-    const isNew = !record.id || record.id.startsWith("rec-");
-    const payload = {
-      module: moduleName,
-      reference_id: record.reference_id || `GH-${moduleName}-${Math.floor(100 + Math.random() * 900)}`,
-      col1: record.col1 || "Unspecified Particular",
-      col2: record.col2 || "",
-      col3: record.col3 || "",
-      col4: record.col4 || "",
-      col5: record.col5 || "",
-      status: record.status || "Active",
-      doctor_id: record.doctor_id || null,
-    };
+): Promise<UnifiedRecord> {
+  const ref =
+    record.reference_id ||
+    `GH-${moduleKey.slice(0, 3)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    if (isNew) {
-      await supabase.from("clinical_ledgers").insert([payload]);
-    } else {
-      await supabase.from("clinical_ledgers").update(payload).eq("id", record.id);
-    }
+  const payload = {
+    module: moduleKey.toUpperCase(),
+    reference_id: ref,
+    col1: record.col1 || "",
+    col2: record.col2 || "",
+    col3: record.col3 || "",
+    col4: record.col4 || "",
+    col5: record.col5 || "",
+    status: record.status || "Active",
+    doctor_id: record.doctor_id || null,
+  };
 
-    return await getLiveModuleRecords(moduleName);
-  } catch {
-    return await getLiveModuleRecords(moduleName);
+  const { data, error } = await supabase
+    .from("clinical_ledgers")
+    .insert([payload])
+    .select()
+    .single();
+
+  if (error) {
+    console.error(`Insert failed in ${moduleKey}:`, error);
+    throw new Error(error.message || "Database failed to persist staff record");
   }
+
+  return data as UnifiedRecord;
 }
 
 export async function deleteLiveModuleRecord(
-  moduleName: string,
+  moduleKey: string,
   id: string
-): Promise<UnifiedRecord[]> {
-  try {
-    await supabase.from("clinical_ledgers").delete().eq("id", id);
-    return await getLiveModuleRecords(moduleName);
-  } catch {
-    return await getLiveModuleRecords(moduleName);
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("clinical_ledgers")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error(`Delete failed in ${moduleKey}:`, error);
+    return false;
   }
-}
-
-// Backward-compatible stubs & aliases for legacy dashboard callers
-export function getUniversalStore(): Record<string, UnifiedRecord[]> {
-  return {};
-}
-
-export function deleteUniversalRecord(moduleName: string, id: string): Record<string, UnifiedRecord[]> {
-  deleteLiveModuleRecord(moduleName, id);
-  return {};
-}
-
-export function saveUniversalRecord(moduleName: string, record: Partial<UnifiedRecord>): Record<string, UnifiedRecord[]> {
-  saveLiveModuleRecord(moduleName, record);
-  return {};
+  return true;
 }

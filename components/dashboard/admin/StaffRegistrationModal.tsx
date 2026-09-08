@@ -39,16 +39,23 @@ export default function StaffRegistrationModal({
     setErrorMsg(null);
 
     try {
-      // Store complete credentialed record in clinical_ledgers table
       await saveLiveModuleRecord(type, {
         reference_id: `GH-${isMedical ? "MED" : "SUP"}-${Math.floor(1000 + Math.random() * 9000)}`,
         col1: fullName.trim(),
-        col2: `${designation.trim()} • ${department.trim() || (isMedical ? "Clinical Services" : "Operations")}`,
-        col3: email.trim().toLowerCase(), // Saved in col3 for credential verification
-        col4: password.trim(),             // Saved in col4 for credential verification
+        col2: `${designation.trim()} • ${department.trim() || (isMedical ? "Clinical Ward" : "Operations")}`,
+        col3: email.trim().toLowerCase(),
+        col4: password.trim(),
         col5: `${phone.trim()} | ${isMedical ? "Reg: " + qualificationOrId.trim() : "ID: " + qualificationOrId.trim()} | ${shift}`,
         status: status,
       });
+
+      // Clear fields on success
+      setFullName("");
+      setEmail("");
+      setDesignation("");
+      setDepartment("");
+      setPhone("");
+      setQualificationOrId("");
 
       onSuccess();
       onClose();
@@ -97,7 +104,6 @@ export default function StaffRegistrationModal({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3.5 pt-2">
-          {/* Full Name & Phone */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
@@ -131,7 +137,6 @@ export default function StaffRegistrationModal({
             </div>
           </div>
 
-          {/* Login Email & Password Provisioned by Admin */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-teal-50/50 p-3 rounded-2xl border border-teal-100">
             <div>
               <label className="block text-[10px] font-bold text-teal-900 uppercase mb-1">
@@ -142,7 +147,7 @@ export default function StaffRegistrationModal({
                 <input
                   type="email"
                   required
-                  placeholder={isMedical ? "medical@gavanehospital.in" : "support@gavanehospital.in"}
+                  placeholder={isMedical ? "rmo@gavanehospital.in" : "support@gavanehospital.in"}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-white border border-teal-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -159,7 +164,7 @@ export default function StaffRegistrationModal({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Staff@2026"
+                  placeholder="Staff@2026"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 bg-white border border-teal-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
@@ -168,7 +173,6 @@ export default function StaffRegistrationModal({
             </div>
           </div>
 
-          {/* Designation & Department */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
@@ -186,7 +190,7 @@ export default function StaffRegistrationModal({
 
             <div>
               <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-                Department / Clinical Ward *
+                Department / Ward *
               </label>
               <input
                 type="text"
@@ -199,7 +203,6 @@ export default function StaffRegistrationModal({
             </div>
           </div>
 
-          {/* Registration / Employee Code & Shift */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
@@ -237,7 +240,6 @@ export default function StaffRegistrationModal({
             </div>
           </div>
 
-          {/* Status Selection */}
           <div>
             <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
               Credential Status
