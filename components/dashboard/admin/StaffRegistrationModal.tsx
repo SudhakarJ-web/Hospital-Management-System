@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X, UserCheck, Stethoscope, Phone, ShieldCheck, Clock, Award, Mail, Lock } from "lucide-react";
-import { saveLiveModuleRecord } from "@/lib/sync/hospitalMasterSync";
+import { saveLiveModuleRecord, UnifiedRecord } from "@/lib/sync/hospitalMasterSync";
 
 interface StaffRegistrationModalProps {
   isOpen: boolean;
   type: "MEDICAL_STAFF" | "SUPPORT_STAFF";
+  initialRecord?: UnifiedRecord | null;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -14,6 +15,7 @@ interface StaffRegistrationModalProps {
 export default function StaffRegistrationModal({
   isOpen,
   type,
+  initialRecord,
   onClose,
   onSuccess,
 }: StaffRegistrationModalProps) {
@@ -31,6 +33,41 @@ export default function StaffRegistrationModal({
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (initialRecord) {
+      setFullName(initialRecord.col1 || "");
+      
+      // Parse designation • department
+      const parts = (initialRecord.col2 || "").split("•").map((s) => s.trim());
+      setDesignation(parts[0] || "");
+      setDepartment(parts[1] || "");
+
+      setEmail(initialRecord.col3 || "");
+      setPassword(initialRecord.col4 || "Staff@2026");
+
+      // Parse col5: "phone | Reg/ID | shift"
+      const col5Parts = (initialRecord.col5 || "").split("|").map((s) => s.trim());
+      setPhone(col5Parts[0] || "");
+      if (col5Parts[1]) {
+        setQualificationOrId(col5Parts[1].replace(/^(Reg:\s*|ID:\s*)/i, ""));
+      } else {
+        setQualificationOrId("");
+      }
+      setShift(col5Parts[2] || "Day Shift (08:00 AM - 04:00 PM)");
+      setStatus(initialRecord.status || "Active");
+    } else {
+      setFullName("");
+      setEmail("");
+      setPassword("Staff@2026");
+      setDesignation("");
+      setDepartment("");
+      setPhone("");
+      setQualificationOrId("");
+      setShift("Day Shift (08:00 AM - 04:00 PM)");
+      setStatus("Active");
+    }
+  }, [initialRecord, isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,7 +77,8 @@ export default function StaffRegistrationModal({
 
     try {
       await saveLiveModuleRecord(type, {
-        reference_id: `GH-${isMedical ? "MED" : "SUP"}-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: initialRecord?.id,
+        reference_id: initialRecord?.reference_id || `GH-${isMedical ? "MED" : "SUP"}-${Math.floor(1000 + Math.random() * 9000)}`,
         col1: fullName.trim(),
         col2: `${designation.trim()} • ${department.trim() || (isMedical ? "Clinical Ward" : "Operations")}`,
         col3: email.trim().toLowerCase(),
@@ -49,18 +87,10 @@ export default function StaffRegistrationModal({
         status: status,
       });
 
-      // Clear fields on success
-      setFullName("");
-      setEmail("");
-      setDesignation("");
-      setDepartment("");
-      setPhone("");
-      setQualificationOrId("");
-
       onSuccess();
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to record staff profile";
+      const msg = err instanceof Error ? err.message : "Failed to save staff profile";
       setErrorMsg(msg);
     } finally {
       setSubmitting(false);
@@ -87,12 +117,12 @@ export default function StaffRegistrationModal({
               Administrative Credentialing
             </span>
             <h2 className="text-lg font-black text-slate-900 mt-0.5">
-              {isMedical ? "Register Medical Staff Member" : "Register Support Personnel"}
+              {initialRecord
+                ? isMedical ? "Edit Medical Officer" : "Edit Support Personnel"
+                : isMedical ? "Register Medical Staff Member" : "Register Support Personnel"}
             </h2>
             <p className="text-xs text-slate-500">
-              {isMedical
-                ? "Onboard Resident Medical Officers (RMO), ICU physicians, or Nursing Supervisors."
-                : "Record administrative officers, billing executives, or triage support staff."}
+              Update credentials, login information, duty shifts, or active status.
             </p>
           </div>
         </div>
@@ -269,7 +299,7 @@ export default function StaffRegistrationModal({
               className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-black text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center space-x-1.5"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>{submitting ? "Registering..." : "Record & Authorize Staff Member"}</span>
+              <span>{submitting ? "Saving..." : initialRecord ? "Update Staff Member" : "Record & Authorize Staff Member"}</span>
             </button>
           </div>
         </form>

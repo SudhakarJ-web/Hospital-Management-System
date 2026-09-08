@@ -66,18 +66,34 @@ export async function saveLiveModuleRecord(
     doctor_id: record.doctor_id || null,
   };
 
-  const { data, error } = await supabase
-    .from("clinical_ledgers")
-    .insert([payload])
-    .select()
-    .single();
+  if (record.id) {
+    // Update existing record
+    const { data, error } = await supabase
+      .from("clinical_ledgers")
+      .update(payload)
+      .eq("id", record.id)
+      .select()
+      .single();
 
-  if (error) {
-    console.error(`Insert failed in ${moduleKey}:`, error);
-    throw new Error(error.message || "Database failed to persist staff record");
+    if (error) {
+      console.error(`Update failed in ${moduleKey}:`, error);
+      throw new Error(error.message || "Database failed to update staff record");
+    }
+    return data as UnifiedRecord;
+  } else {
+    // Insert new record
+    const { data, error } = await supabase
+      .from("clinical_ledgers")
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error(`Insert failed in ${moduleKey}:`, error);
+      throw new Error(error.message || "Database failed to persist staff record");
+    }
+    return data as UnifiedRecord;
   }
-
-  return data as UnifiedRecord;
 }
 
 export async function deleteLiveModuleRecord(

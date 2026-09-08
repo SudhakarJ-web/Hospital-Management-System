@@ -80,9 +80,10 @@ export default function AdminDashboardPage() {
   const [doctorModalOpen, setDoctorModalOpen] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<SharedDoctor | null>(null);
 
-  // Staff Registration Modal
+  // Staff Registration & Edit Modal
   const [staffModalOpen, setStaffModalOpen] = useState(false);
   const [staffModalType, setStaffModalType] = useState<"MEDICAL_STAFF" | "SUPPORT_STAFF">("MEDICAL_STAFF");
+  const [selectedStaff, setSelectedStaff] = useState<UnifiedRecord | null>(null);
 
   // Session Authentication Guard
   useEffect(() => {
@@ -169,7 +170,14 @@ export default function AdminDashboardPage() {
     loadData();
   };
 
-  const openStaffModal = (type: "MEDICAL_STAFF" | "SUPPORT_STAFF") => {
+  const openNewStaffModal = (type: "MEDICAL_STAFF" | "SUPPORT_STAFF") => {
+    setSelectedStaff(null);
+    setStaffModalType(type);
+    setStaffModalOpen(true);
+  };
+
+  const openEditStaffModal = (type: "MEDICAL_STAFF" | "SUPPORT_STAFF", staff: UnifiedRecord) => {
+    setSelectedStaff(staff);
     setStaffModalType(type);
     setStaffModalOpen(true);
   };
@@ -242,7 +250,7 @@ export default function AdminDashboardPage() {
               ADMINISTRATIVE CONTROL
             </div>
 
-            {/* 1. MASTER EXECUTIVE DESK (Placed at the top) */}
+            {/* 1. MASTER EXECUTIVE DESK */}
             <button
               onClick={() => setActiveTab("desk")}
               className={`w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
@@ -538,14 +546,14 @@ export default function AdminDashboardPage() {
                     <span>+ Add Specialist Doctor</span>
                   </button>
                   <button
-                    onClick={() => openStaffModal("MEDICAL_STAFF")}
+                    onClick={() => openNewStaffModal("MEDICAL_STAFF")}
                     className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center space-x-1.5 cursor-pointer"
                   >
                     <HeartHandshake className="w-3.5 h-3.5 text-teal-400" />
                     <span>+ Register Medical Staff</span>
                   </button>
                   <button
-                    onClick={() => openStaffModal("SUPPORT_STAFF")}
+                    onClick={() => openNewStaffModal("SUPPORT_STAFF")}
                     className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center space-x-1.5 cursor-pointer"
                   >
                     <UserCheck className="w-3.5 h-3.5 text-teal-600" />
@@ -699,7 +707,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* VIEW: MEDICAL DIRECTORY */}
+          {/* VIEW: MEDICAL DIRECTORY (WITH EDIT CONTROLS) */}
           {activeTab === "medical_staff" && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between">
@@ -708,7 +716,7 @@ export default function AdminDashboardPage() {
                   <p className="text-xs text-slate-500">Resident Medical Officers (RMO), Clinical Specialists, and Nursing Superintendents.</p>
                 </div>
                 <button
-                  onClick={() => openStaffModal("MEDICAL_STAFF")}
+                  onClick={() => openNewStaffModal("MEDICAL_STAFF")}
                   className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-xs cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -750,12 +758,22 @@ export default function AdminDashboardPage() {
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-right">
-                            <button
-                              onClick={() => handleDeleteStaffMember("MEDICAL_STAFF", staff.id)}
-                              className="p-1 text-slate-400 hover:text-rose-600 rounded"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex items-center justify-end space-x-1">
+                              <button
+                                onClick={() => openEditStaffModal("MEDICAL_STAFF", staff)}
+                                className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors cursor-pointer"
+                                title="Edit Staff Member"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteStaffMember("MEDICAL_STAFF", staff.id)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Delete Staff Member"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -766,7 +784,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* VIEW: SUPPORT DIRECTORY */}
+          {/* VIEW: SUPPORT DIRECTORY (WITH EDIT CONTROLS) */}
           {activeTab === "support_staff" && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between">
@@ -775,7 +793,7 @@ export default function AdminDashboardPage() {
                   <p className="text-xs text-slate-500">Reception triage, billing officers, OT technicians, and ward assistants.</p>
                 </div>
                 <button
-                  onClick={() => openStaffModal("SUPPORT_STAFF")}
+                  onClick={() => openNewStaffModal("SUPPORT_STAFF")}
                   className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-xs cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -817,12 +835,22 @@ export default function AdminDashboardPage() {
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-right">
-                            <button
-                              onClick={() => handleDeleteStaffMember("SUPPORT_STAFF", staff.id)}
-                              className="p-1 text-slate-400 hover:text-rose-600 rounded"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex items-center justify-end space-x-1">
+                              <button
+                                onClick={() => openEditStaffModal("SUPPORT_STAFF", staff)}
+                                className="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors cursor-pointer"
+                                title="Edit Staff Member"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteStaffMember("SUPPORT_STAFF", staff.id)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Delete Staff Member"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -885,11 +913,12 @@ export default function AdminDashboardPage() {
         />
       )}
 
-      {/* Medical & Support Staff Registration Modal */}
+      {/* Medical & Support Staff Registration and Edit Modal */}
       {staffModalOpen && (
         <StaffRegistrationModal
           isOpen={staffModalOpen}
           type={staffModalType}
+          initialRecord={selectedStaff}
           onClose={() => setStaffModalOpen(false)}
           onSuccess={loadData}
         />
