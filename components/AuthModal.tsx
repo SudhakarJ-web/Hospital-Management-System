@@ -33,6 +33,8 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
     try {
       if (role === "admin") {
         if (cleanEmail === "admin@gavanehospital.in" && cleanPassword === "Admin@2026") {
+          sessionStorage.setItem("staff_email", cleanEmail);
+          sessionStorage.setItem("staff_role", "admin");
           router.push("/dashboard/admin");
           onClose();
         } else {
@@ -46,32 +48,39 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
         );
 
         if (matched) {
+          sessionStorage.setItem("staff_email", matched.email);
+          sessionStorage.setItem("staff_role", "doctor");
+          sessionStorage.setItem("doctor_slug", matched.slug);
           router.push(`/dashboard/${matched.slug}`);
           onClose();
         } else {
           setErrorMsg("Invalid Doctor email or password.");
         }
       } else if (role === "medical") {
-        // Authenticate against database records created by Admin
+        // Authenticate against database records provisioned by Admin
         const medicalRecords = await getLiveModuleRecords("MEDICAL_STAFF");
         const matchedStaff = medicalRecords.find(
           (s) => s.col3?.toLowerCase() === cleanEmail && s.col4 === cleanPassword
         );
 
         if (matchedStaff || (cleanEmail === "medical@gavanehospital.in" && cleanPassword === "Medical@2026")) {
+          sessionStorage.setItem("staff_email", cleanEmail);
+          sessionStorage.setItem("staff_role", "medical");
           router.push("/dashboard/medical");
           onClose();
         } else {
           setErrorMsg("Invalid Medical Officer credentials or profile not authorized by Admin.");
         }
       } else if (role === "support") {
-        // Authenticate against database records created by Admin
+        // Authenticate against database records provisioned by Admin
         const supportRecords = await getLiveModuleRecords("SUPPORT_STAFF");
         const matchedStaff = supportRecords.find(
           (s) => s.col3?.toLowerCase() === cleanEmail && s.col4 === cleanPassword
         );
 
         if (matchedStaff || (cleanEmail === "support@gavanehospital.in" && cleanPassword === "Support@2026")) {
+          sessionStorage.setItem("staff_email", cleanEmail);
+          sessionStorage.setItem("staff_role", "support");
           router.push("/dashboard/support");
           onClose();
         } else {

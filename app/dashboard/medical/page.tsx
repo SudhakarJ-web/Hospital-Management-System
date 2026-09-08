@@ -1,424 +1,393 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import DashboardSidebar, { SidebarModule } from "@/components/dashboard/DashboardSidebar";
-
-// Universal Shared & Dedicated Medical Views
-import InventoryView from "@/components/dashboard/shared/InventoryView";
-import PrescriptionDispensary from "@/components/dashboard/medical/PrescriptionDispensary";
-import DiagnosticReagents from "@/components/dashboard/medical/DiagnosticReagents";
-import RadiologyConsumables from "@/components/dashboard/medical/RadiologyConsumables";
-import SupplierPurchaseOrders from "@/components/dashboard/medical/SupplierPurchaseOrders";
-import ExpiredQuarantine from "@/components/dashboard/medical/ExpiredQuarantine";
-
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getLiveModuleRecords, saveLiveModuleRecord, deleteLiveModuleRecord, UnifiedRecord } from "@/lib/sync/hospitalMasterSync";
 import {
-  getUniversalStore,
-  saveUniversalRecord,
-  deleteUniversalRecord,
-  UnifiedRecord,
-} from "@/lib/sync/hospitalMasterSync";
-import {
-  getSharedPrescriptions,
-  dispensePrescription,
-  SharedPrescription,
-} from "@/lib/sync/prescriptionsSync";
-import { supabase } from "@/lib/supabase";
-
-const MEDICAL_SIDEBAR_MODULES: SidebarModule[] = [
-  { id: "PHARMACY_STOCK", label: "PHARMACY STOCK & DRUGS", icon: "💊" },
-  { id: "DISPENSARY", label: "PRESCRIPTION DISPENSARY", icon: "📦" },
-  { id: "PATHOLOGY_LAB", label: "PATHOLOGY REAGENTS & KITS", icon: "🔬" },
-  { id: "RADIOLOGY_SUPPLIES", label: "RADIOLOGY FILMS & CONSUMABLES", icon: "📡" },
-  { id: "SUPPLIERS", label: "SUPPLIERS & PO ORDERS", icon: "🚚" },
-  { id: "EXPIRED_LEDGER", label: "AUDIT & EXPIRED LOGS", icon: "⚠️" },
-];
+  Activity,
+  Boxes,
+  Pill,
+  FlaskConical,
+  Scan,
+  ShoppingCart,
+  Clock,
+  RotateCw,
+  Power,
+  Plus,
+  Trash2,
+  Lock,
+} from "lucide-react";
 
 export default function MedicalDashboardPage() {
-  const [activeModule, setActiveModule] = useState<string>("PHARMACY_STOCK");
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const router = useRouter();
 
-  const [pharmacistName, setPharmacistName] = useState<string>("Priya Nair");
-  const [pharmacistEmail, setPharmacistEmail] = useState<string>("medical@gavanehospital.in");
+  const [activeOfficer, setActiveOfficer] = useState<{ name: string; email: string } | null>(null);
+  const [authorized, setAuthorized] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  const [dataStore, setDataStore] = useState<Record<string, UnifiedRecord[]>>({});
-  const [prescriptions, setPrescriptions] = useState<SharedPrescription[]>([]);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<
+    "pharmacy_stock" | "dispensary" | "pathology" | "radiology" | "suppliers" | "audit"
+  >("pharmacy_stock");
 
-  // Dynamic Add / Edit Modal State
-  const [showModal, setShowModal] = useState<boolean>(false);
-  const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [editTargetId, setEditTargetId] = useState<string | null>(null);
-  const [formCol1, setFormCol1] = useState("");
-  const [formCol2, setFormCol2] = useState("");
-  const [formCol3, setFormCol3] = useState("");
-  const [formCol4, setFormCol4] = useState("");
-  const [formCol5, setFormCol5] = useState("");
-  const [formStatus, setFormStatus] = useState<"Active" | "Pending" | "Completed" | "Suspended">("Active");
+  const [records, setRecords] = useState<UnifiedRecord[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
 
+  // Authentication and Session Verification
   useEffect(() => {
-    async function resolveSession() {
-      try {
-        const { data } = await supabase.auth.getUser();
-        if (data?.user) {
-          const metaName = data.user.user_metadata?.full_name || data.user.user_metadata?.name;
-          if (metaName) setPharmacistName(metaName);
-          if (data.user.email) setPharmacistEmail(data.user.email);
-        }
-      } catch {}
+    async function verifyAccess() {
+      // Check session storage for authorized login
+      const sessionEmail = sessionStorage.getItem("staff_email");
+      const sessionRole = sessionStorage.getItem("staff_role");
+
+      if (!sessionEmail || sessionRole !== "medical") {
+        // Reject unauthenticated access
+        setAuthorized(false);
+        setCheckingAuth(false);
+        router.replace("/?login=medical");
+        return;
+      }
+
+      // Resolve live officer name from database
+      const staffList = await getLiveModuleRecords("MEDICAL_STAFF");
+      const matched = staffList.find((s) => s.col3?.toLowerCase() === sessionEmail.toLowerCase());
+
+      setActiveOfficer({
+        name: matched ? matched.col1 : "Medical Officer",
+        email: sessionEmail,
+      });
+
+      setAuthorized(true);
+      setCheckingAuth(false);
     }
-    resolveSession();
-  }, []);
 
-  const loadData = useCallback(async () => {
-    setDataStore(getUniversalStore());
-    setPrescriptions(await getSharedPrescriptions());
-  }, []);
+    verifyAccess();
+  }, [router]);
+
+  const loadModuleData = async () => {
+    setIsSyncing(true);
+    try {
+      const moduleKeyMap: Record<string, string> = {
+        pharmacy_stock: "STOCK",
+        dispensary: "DISPENSARY",
+        pathology: "PATHOLOGY",
+        radiology: "RADIOLOGY",
+        suppliers: "SUPPLIERS",
+        audit: "AUDIT",
+      };
+      const data = await getLiveModuleRecords(moduleKeyMap[activeTab] || "STOCK");
+      setRecords(data);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (authorized) {
+      loadModuleData();
+    }
+  }, [authorized, activeTab]);
 
-  const handleDispense = async (id: string, patientName: string) => {
-    const updated = await dispensePrescription(id, pharmacistName);
-    setPrescriptions(updated);
-    setFeedback({
-      type: "success",
-      text: `Prescription for ${patientName} fulfilled and dispensed successfully.`,
-    });
-  };
+  const handleAddItem = async () => {
+    const title = prompt("Enter Item / Record Title:");
+    if (!title) return;
+    const batchOrCode = prompt("Enter Batch Number or Lot ID:") || "LOT-2026";
+    const qty = prompt("Enter Quantity / Available Count:") || "100 Units";
 
-  const handleOpenAdd = () => {
-    setIsEditing(false);
-    setEditTargetId(null);
-    setFormCol1("");
-    setFormCol2("");
-    setFormCol3("");
-    setFormCol4("");
-    setFormCol5("");
-    setFormStatus("Active");
-    setShowModal(true);
-  };
-
-  const handleOpenEdit = (item: UnifiedRecord) => {
-    setIsEditing(true);
-    setEditTargetId(item.id);
-    setFormCol1(item.col1);
-    setFormCol2(item.col2);
-    setFormCol3(item.col3);
-    setFormCol4(item.col4);
-    setFormCol5(item.col5);
-    setFormStatus(item.status);
-    setShowModal(true);
-  };
-
-  const handleSaveModal = (e: React.FormEvent) => {
-    e.preventDefault();
-    const targetKey = activeModule === "PHARMACY_STOCK" ? "Stock" : activeModule === "PATHOLOGY_LAB" ? "Pathology" : activeModule === "RADIOLOGY_SUPPLIES" ? "Radiology" : activeModule;
-
-    const randomSuffix = Math.floor(100 + Math.random() * 900);
-    const newRecord: UnifiedRecord = {
-      id: editTargetId || `${targetKey.toLowerCase()}-${Date.now()}`,
-      reference_id: isEditing && editTargetId ? (dataStore[targetKey]?.find((r) => r.id === editTargetId)?.reference_id || `MED-2026-${randomSuffix}`) : `MED-2026-${randomSuffix}`,
-      category: targetKey,
-      col1: formCol1,
-      col2: formCol2,
-      col3: formCol3,
-      col4: formCol4,
-      col5: formCol5,
-      status: formStatus,
-      created_at: new Date().toLocaleDateString("en-IN"),
+    const moduleKeyMap: Record<string, string> = {
+      pharmacy_stock: "STOCK",
+      dispensary: "DISPENSARY",
+      pathology: "PATHOLOGY",
+      radiology: "RADIOLOGY",
+      suppliers: "SUPPLIERS",
+      audit: "AUDIT",
     };
 
-    const updatedStore = saveUniversalRecord(targetKey, newRecord);
-    setDataStore(updatedStore);
-    setFeedback({ type: "success", text: `Item saved in ${activeModule}.` });
-    setShowModal(false);
+    await saveLiveModuleRecord(moduleKeyMap[activeTab] || "STOCK", {
+      col1: title,
+      col2: batchOrCode,
+      col3: qty,
+      col4: activeOfficer?.name || "Medical Officer",
+      status: "Available",
+    });
+
+    loadModuleData();
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (!confirm(`Retire ${name}?`)) return;
-    const targetKey = activeModule === "PHARMACY_STOCK" ? "Stock" : activeModule === "PATHOLOGY_LAB" ? "Pathology" : activeModule === "RADIOLOGY_SUPPLIES" ? "Radiology" : activeModule;
-    const updated = deleteUniversalRecord(targetKey, id);
-    setDataStore(updated);
-    setFeedback({ type: "success", text: `Removed ${name} from ledger.` });
+  const handleDeleteItem = async (id: string) => {
+    if (!confirm("Delete record from live registry?")) return;
+    const moduleKeyMap: Record<string, string> = {
+      pharmacy_stock: "STOCK",
+      dispensary: "DISPENSARY",
+      pathology: "PATHOLOGY",
+      radiology: "RADIOLOGY",
+      suppliers: "SUPPLIERS",
+      audit: "AUDIT",
+    };
+    await deleteLiveModuleRecord(moduleKeyMap[activeTab] || "STOCK", id);
+    loadModuleData();
   };
 
-  return (
-    <div className="min-h-screen bg-[#f0f4f8] flex flex-col font-sans text-slate-800">
-      <DashboardHeader
-        roleIcon="💊"
-        loggedAsText={`${pharmacistName} (${pharmacistEmail})`}
-        roleSubtitle="Central Pharmacy & Medical Depot Console"
-        bannerText="Central Pharmacy, Reagent Consumables & Stock Dispensation Ledger"
-      />
+  const handleExit = () => {
+    sessionStorage.removeItem("staff_email");
+    sessionStorage.removeItem("staff_role");
+    router.push("/");
+  };
 
-      {/* Mobile Switch Bar */}
-      <div className="lg:hidden bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between shadow-xs">
-        <div className="flex items-center space-x-2 text-xs font-bold text-white truncate">
-          <span className="text-teal-400">💊 Inventory:</span>
-          <span className="uppercase text-teal-300 truncate">
-            {MEDICAL_SIDEBAR_MODULES.find((m) => m.id === activeModule)?.label || activeModule}
-          </span>
-        </div>
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-[#07131b] flex items-center justify-center text-white text-xs font-bold font-sans">
+        Validating Medical Officer Authorization...
+      </div>
+    );
+  }
+
+  if (!authorized) {
+    return (
+      <div className="min-h-screen bg-[#07131b] flex flex-col items-center justify-center text-white space-y-3 font-sans">
+        <Lock className="w-8 h-8 text-rose-500" />
+        <h2 className="text-sm font-black">Access Denied: Unauthenticated Session</h2>
         <button
-          onClick={() => setMobileMenuOpen((prev) => !prev)}
-          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold transition-all shadow-xs flex items-center space-x-1"
+          onClick={() => router.push("/")}
+          className="px-4 py-2 bg-teal-600 rounded-xl text-xs font-bold cursor-pointer"
         >
-          <span>{mobileMenuOpen ? "✕ Close" : "☰ Switch Module"}</span>
+          Return to Hospital Portal
         </button>
       </div>
+    );
+  }
 
-      <div className="flex flex-1 overflow-hidden relative">
-        <div className="hidden lg:block">
-          <DashboardSidebar
-            modules={MEDICAL_SIDEBAR_MODULES}
-            activeModule={activeModule}
-            onSelectModule={(id) => {
-              setActiveModule(id);
-              setSearchTerm("");
-            }}
-            sectionTitle="Medical & Drug Modules"
-          />
+  const filteredRecords = records.filter(
+    (r) =>
+      r.col1?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.reference_id?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="min-h-screen bg-[#07131b] text-slate-200 flex flex-col font-sans">
+      {/* Top Navbar */}
+      <header className="bg-[#050f16] border-b border-slate-800/80 px-6 py-3 flex items-center justify-between z-30 shadow-md">
+        <div className="flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-xl bg-teal-700/80 border border-teal-500/30 flex items-center justify-center text-white font-black shadow-xs">
+            <Activity className="w-5 h-5 text-teal-300" />
+          </div>
+          <div>
+            <div className="text-xs font-black tracking-tight text-white uppercase">
+              GAVANE HOSPITAL & RESEARCH CENTRE
+            </div>
+            <div className="text-[10px] text-teal-400 font-bold">
+              • Central Pharmacy & Medical Depot Console
+            </div>
+          </div>
         </div>
 
-        {/* Mobile Drawer */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden flex flex-col bg-slate-950/80 backdrop-blur-sm">
-            <div className="w-4/5 max-w-xs bg-white h-full shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-left duration-200">
-              <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
-                <span className="font-bold text-xs uppercase tracking-wider text-teal-400">Pharmacy Menu</span>
-                <button
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 font-bold hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-1">
-                {MEDICAL_SIDEBAR_MODULES.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => {
-                      setActiveModule(m.id);
-                      setSearchTerm("");
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                      activeModule === m.id ? "bg-teal-600 text-white shadow-sm" : "text-slate-700 hover:bg-slate-100"
-                    }`}
-                  >
-                    <span>{m.icon}</span>
-                    <span className="truncate">{m.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex-1" onClick={() => setMobileMenuOpen(false)} />
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-xl text-xs text-slate-300">
+            <Activity className="w-3.5 h-3.5 text-teal-400" />
+            <span>
+              Logged as: <strong className="text-white">{activeOfficer?.name}</strong> ({activeOfficer?.email})
+            </span>
           </div>
-        )}
 
-        <main className="flex-1 p-3 sm:p-5 overflow-y-auto space-y-4 sm:space-y-5 min-w-0">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-xs">
-            <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 px-1 py-0.5 min-w-0">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0"></span>
-              <span className="truncate">Active Medical Ledger: <strong className="text-teal-700 uppercase">{activeModule}</strong></span>
+          <button
+            onClick={handleExit}
+            className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer shadow-xs"
+          >
+            <Power className="w-3.5 h-3.5" />
+            <span>Close / Exit</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Main Workspace Frame */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Dark Sidebar */}
+        <aside className="w-64 bg-[#07131b] border-r border-slate-800/80 flex flex-col justify-between p-3 shrink-0 overflow-y-auto">
+          <div className="space-y-1">
+            <div className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400">
+              MEDICAL & DRUG MODULES
             </div>
 
-            <div className="flex items-center space-x-2 w-full sm:w-auto justify-end shrink-0">
+            <button
+              onClick={() => setActiveTab("pharmacy_stock")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "pharmacy_stock"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Boxes className="w-4 h-4" />
+              <span>PHARMACY STOCK & DRUGS</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("dispensary")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "dispensary"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Pill className="w-4 h-4" />
+              <span>PRESCRIPTION DISPENSARY</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("pathology")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "pathology"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <FlaskConical className="w-4 h-4" />
+              <span>PATHOLOGY REAGENTS & KITS</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("radiology")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "radiology"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Scan className="w-4 h-4" />
+              <span>RADIOLOGY FILMS & CONSUMABLES</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("suppliers")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "suppliers"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <ShoppingCart className="w-4 h-4" />
+              <span>SUPPLIERS & PO ORDERS</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("audit")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "audit"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+              <span>AUDIT & EXPIRED LOGS</span>
+            </button>
+          </div>
+
+          <div className="pt-4 border-t border-slate-800/60 text-[10px] text-slate-400 space-y-0.5">
+            <div className="font-bold text-slate-300">SHOURYA TECHNOLOGIES</div>
+            <div>Hadapsar, Pune, Maharashtra.</div>
+            <div>Contact: +91 9860043213</div>
+          </div>
+        </aside>
+
+        {/* Right Main Body */}
+        <main className="flex-1 bg-slate-100 p-6 overflow-y-auto">
+          {/* Top Status Strip */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 mb-5 flex items-center justify-between shadow-2xs">
+            <div className="flex items-center space-x-2 text-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-bold text-slate-700">
+                Active Medical Ledger:{" "}
+                <strong className="text-teal-700 uppercase">{activeTab}</strong>
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-3">
               <button
-                onClick={loadData}
-                className="flex-1 sm:flex-none px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-bold rounded-lg transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+                onClick={loadModuleData}
+                disabled={isSyncing}
+                className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs"
               >
-                <span>🔄</span>
+                <RotateCw className={`w-3.5 h-3.5 text-teal-600 ${isSyncing ? "animate-spin" : ""}`} />
                 <span>Sync Stock</span>
               </button>
-
-              {activeModule !== "DISPENSARY" && (
-                <button
-                  onClick={handleOpenAdd}
-                  className="flex-1 sm:flex-none px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
-                >
-                  <span>+</span>
-                  <span>Add Item</span>
-                </button>
-              )}
+              <button
+                onClick={handleAddItem}
+                className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Add Item</span>
+              </button>
             </div>
           </div>
 
-          {feedback && (
-            <div className="p-3 rounded-xl border text-xs font-bold bg-emerald-50 border-emerald-300 text-emerald-900 flex justify-between items-center">
-              <span>{feedback.text}</span>
-              <button onClick={() => setFeedback(null)} className="font-bold px-2 py-0.5">✕</button>
+          {/* Module Table Canvas */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 uppercase">
+                  {activeTab.replace(/_/g, " ")} Workspace
+                </h3>
+                <p className="text-xs text-slate-500">Live database ledger node • {records.length} total entries</p>
+              </div>
+
+              <input
+                type="text"
+                placeholder="Search ledger..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-64 px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
+              />
             </div>
-          )}
 
-          {/* Module Views */}
-          {activeModule === "PHARMACY_STOCK" && (
-            <InventoryView
-              records={dataStore.Stock || []}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onOpenEdit={handleOpenEdit}
-              onDelete={handleDelete}
-            />
-          )}
-
-          {activeModule === "DISPENSARY" && (
-            <PrescriptionDispensary
-              prescriptions={prescriptions}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onDispense={handleDispense}
-            />
-          )}
-
-          {activeModule === "PATHOLOGY_LAB" && (
-            <DiagnosticReagents
-              records={dataStore.Pathology || []}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onOpenEdit={handleOpenEdit}
-              onDelete={handleDelete}
-            />
-          )}
-
-          {activeModule === "RADIOLOGY_SUPPLIES" && (
-            <RadiologyConsumables
-              records={dataStore.Radiology || []}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onOpenEdit={handleOpenEdit}
-              onDelete={handleDelete}
-            />
-          )}
-
-          {activeModule === "SUPPLIERS" && (
-            <SupplierPurchaseOrders
-              records={dataStore.SUPPLIERS || []}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onOpenEdit={handleOpenEdit}
-              onDelete={handleDelete}
-            />
-          )}
-
-          {activeModule === "EXPIRED_LEDGER" && (
-            <ExpiredQuarantine
-              records={dataStore.EXPIRED_LEDGER || []}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onOpenEdit={handleOpenEdit}
-              onDelete={handleDelete}
-            />
-          )}
+            <div className="overflow-x-auto border border-slate-200 rounded-xl">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                  <tr>
+                    <th className="py-2.5 px-3">Ref ID</th>
+                    <th className="py-2.5 px-3">Item / Description</th>
+                    <th className="py-2.5 px-3">Batch / Lot</th>
+                    <th className="py-2.5 px-3">Available Count</th>
+                    <th className="py-2.5 px-3">Recorded By</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3 text-right">Controls</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {filteredRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400 text-xs italic">
+                        No records active in this ledger.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRecords.map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-2.5 px-3 font-mono font-bold text-teal-800">{item.reference_id}</td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">{item.col1}</td>
+                        <td className="py-2.5 px-3 text-slate-600">{item.col2 || "-"}</td>
+                        <td className="py-2.5 px-3 font-mono text-teal-700 font-bold">{item.col3 || "-"}</td>
+                        <td className="py-2.5 px-3 text-slate-500">{item.col4 || "Staff"}</td>
+                        <td className="py-2.5 px-3">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {item.status || "Active"}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <button
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </main>
       </div>
-
-      <footer className="bg-[#0b1b2b] text-slate-400 px-4 py-2 text-[10px] flex flex-col sm:flex-row items-center justify-between border-t border-slate-800 gap-1 text-center sm:text-left">
-        <div>Current Session :- <strong className="text-teal-400">{pharmacistName} ({pharmacistEmail}) • Pharmacy Depot</strong></div>
-        <div>Powered by <strong className="text-slate-200">Shourya Technologies</strong> • Status: <span className="text-emerald-400 font-bold">Connected</span></div>
-      </footer>
-
-      {/* Unified Add / Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 sm:p-6 space-y-4 my-auto max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="text-base font-extrabold text-slate-900">
-                {isEditing ? `Edit ${activeModule} Item` : `Add Item to ${activeModule}`}
-              </h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer">✕</button>
-            </div>
-
-            <form onSubmit={handleSaveModal} className="space-y-3.5">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Item / Reagent Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={formCol1}
-                  onChange={(e) => setFormCol1(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">SKU / Code *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formCol2}
-                    onChange={(e) => setFormCol2(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Dosage Form / Section *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formCol3}
-                    onChange={(e) => setFormCol3(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Stock Balance & Price *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formCol4}
-                    onChange={(e) => setFormCol4(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Batch / Expiry / Notes *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formCol5}
-                    onChange={(e) => setFormCol5(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Stock Flag *</label>
-                <select
-                  value={formStatus}
-                  onChange={(e) => setFormStatus(e.target.value as "Active" | "Pending" | "Completed" | "Suspended")}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                >
-                  <option value="Active">In Stock / Available</option>
-                  <option value="Pending">Low Stock / Reorder</option>
-                  <option value="Completed">Cleared / Filled</option>
-                  <option value="Suspended">Quarantined / Expired</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-3 border-t">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-slate-100 text-xs font-bold rounded-lg cursor-pointer">
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm cursor-pointer"
-                >
-                  {isEditing ? "Save Changes" : `Commit Entry`}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -6,12 +6,13 @@ import { SharedDoctor, getSharedDoctors, deleteSharedDoctor } from "@/lib/sync/d
 import { SharedAppointment, getSharedAppointments, deleteSharedAppointment } from "@/lib/sync/appointmentsSync";
 import { SharedPatient, getSharedPatients, deleteSharedPatient } from "@/lib/sync/patientsSync";
 import { SharedPrescription, getSharedPrescriptions } from "@/lib/sync/prescriptionsSync";
-import { getLiveModuleRecords, saveLiveModuleRecord, deleteLiveModuleRecord, UnifiedRecord } from "@/lib/sync/hospitalMasterSync";
+import { getLiveModuleRecords, deleteLiveModuleRecord, UnifiedRecord } from "@/lib/sync/hospitalMasterSync";
 import AppointmentsView from "@/components/dashboard/shared/AppointmentsView";
 import RegistrationView from "@/components/dashboard/shared/RegistrationView";
 import PrescriptionDispensary from "@/components/dashboard/shared/PrescriptionDispensary";
 import CertificatesView from "@/components/dashboard/shared/CertificatesView";
 import AdminDoctorModal from "@/components/dashboard/admin/AdminDoctorModal";
+import StaffRegistrationModal from "@/components/dashboard/admin/StaffRegistrationModal";
 import {
   Activity,
   Users,
@@ -35,6 +36,7 @@ import {
   Edit2,
   HeartHandshake,
   UserCheck,
+  Building2,
 } from "lucide-react";
 
 export default function AdminDashboardPage() {
@@ -67,12 +69,16 @@ export default function AdminDashboardPage() {
     | "analysis"
     | "utility"
     | "certificates"
-  >("appointments");
+  >("desk");
 
-  // Search States
+  // Search & Modal States
   const [searchTerm, setSearchTerm] = useState("");
   const [doctorModalOpen, setDoctorModalOpen] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<SharedDoctor | null>(null);
+
+  // Staff Registration Modal
+  const [staffModalOpen, setStaffModalOpen] = useState(false);
+  const [staffModalType, setStaffModalType] = useState<"MEDICAL_STAFF" | "SUPPORT_STAFF">("MEDICAL_STAFF");
 
   const loadData = async () => {
     setIsSyncing(true);
@@ -130,25 +136,15 @@ export default function AdminDashboardPage() {
     loadData();
   };
 
-  const handleAddStaffMember = async (type: "MEDICAL_STAFF" | "SUPPORT_STAFF") => {
-    const name = prompt(`Enter ${type === "MEDICAL_STAFF" ? "Medical Officer" : "Support Staff"} Full Legal Name:`);
-    if (!name) return;
-    const role = prompt("Enter Designation / Role (e.g. Head Nurse, Ward Incharge, Billing Clerk):") || "Executive";
-    const contact = prompt("Enter Contact Mobile Number:") || "+91 98000 00000";
-
-    await saveLiveModuleRecord(type, {
-      col1: name,
-      col2: role,
-      col3: contact,
-      status: "Active",
-    });
-    loadData();
-  };
-
   const handleDeleteStaffMember = async (type: "MEDICAL_STAFF" | "SUPPORT_STAFF", id: string) => {
     if (!confirm("Remove staff credential record?")) return;
     await deleteLiveModuleRecord(type, id);
     loadData();
+  };
+
+  const openStaffModal = (type: "MEDICAL_STAFF" | "SUPPORT_STAFF") => {
+    setStaffModalType(type);
+    setStaffModalOpen(true);
   };
 
   return (
@@ -196,10 +192,26 @@ export default function AdminDashboardPage() {
               ADMINISTRATIVE CONTROL
             </div>
 
+            {/* 1. MASTER EXECUTIVE DESK (Placed at the very top) */}
+            <button
+              onClick={() => setActiveTab("desk")}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "desk"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+              }`}
+            >
+              <Building2 className="w-4 h-4" />
+              <span>MASTER EXECUTIVE DESK</span>
+            </button>
+
+            {/* 2. DOCTORS DIRECTORY */}
             <button
               onClick={() => setActiveTab("doctors")}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "doctors" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                activeTab === "doctors"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
               }`}
             >
               <div className="flex items-center space-x-2.5">
@@ -209,11 +221,13 @@ export default function AdminDashboardPage() {
               <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded font-mono">{doctors.length}</span>
             </button>
 
-            {/* Medical Staff Directory */}
+            {/* 3. MEDICAL DIRECTORY */}
             <button
               onClick={() => setActiveTab("medical_staff")}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "medical_staff" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                activeTab === "medical_staff"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
               }`}
             >
               <div className="flex items-center space-x-2.5">
@@ -223,11 +237,13 @@ export default function AdminDashboardPage() {
               <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded font-mono">{medicalStaff.length}</span>
             </button>
 
-            {/* Support Staff Directory */}
+            {/* 4. SUPPORT DIRECTORY */}
             <button
               onClick={() => setActiveTab("support_staff")}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "support_staff" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                activeTab === "support_staff"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
               }`}
             >
               <div className="flex items-center space-x-2.5">
@@ -237,23 +253,31 @@ export default function AdminDashboardPage() {
               <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded font-mono">{supportStaff.length}</span>
             </button>
 
+            {/* 5. ONLINE APPOINTMENTS */}
             <button
               onClick={() => setActiveTab("appointments")}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "appointments" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                activeTab === "appointments"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
               }`}
             >
               <div className="flex items-center space-x-2.5">
                 <Calendar className="w-4 h-4" />
                 <span>ONLINE APPOINTMENTS</span>
               </div>
-              <span className="text-[10px] bg-teal-950 text-teal-300 border border-teal-700/50 px-1.5 py-0.5 rounded font-mono">{appointments.length}</span>
+              <span className="text-[10px] bg-teal-950 text-teal-300 border border-teal-700/50 px-1.5 py-0.5 rounded font-mono">
+                {appointments.length}
+              </span>
             </button>
 
+            {/* 6. PATIENT REGISTRATION */}
             <button
               onClick={() => setActiveTab("registration")}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "registration" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                activeTab === "registration"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
               }`}
             >
               <div className="flex items-center space-x-2.5">
@@ -263,10 +287,13 @@ export default function AdminDashboardPage() {
               <span className="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded font-mono">{patients.length}</span>
             </button>
 
+            {/* 7. PRESCRIPTION DISPENSARY */}
             <button
               onClick={() => setActiveTab("dispensary")}
               className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "dispensary" ? "bg-teal-600 text-white shadow-sm" : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                activeTab === "dispensary"
+                  ? "bg-teal-600 text-white shadow-sm"
+                  : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
               }`}
             >
               <Pill className="w-4 h-4" />
@@ -402,7 +429,138 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* ONLINE APPOINTMENTS VIEW (WITH EDIT & CANCEL CONTROLS) */}
+          {/* VIEW: MASTER EXECUTIVE DESK */}
+          {activeTab === "desk" && (
+            <div className="space-y-6">
+              {/* Executive Overview KPI Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider">Medical Board</span>
+                    <Stethoscope className="w-4 h-4 text-teal-600" />
+                  </div>
+                  <div className="text-2xl font-black text-slate-900">{doctors.length} Specialists</div>
+                  <p className="text-[11px] text-teal-700 font-semibold">Active Credentialed Doctors</p>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider">Clinical Staff</span>
+                    <HeartHandshake className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div className="text-2xl font-black text-slate-900">{medicalStaff.length} Officers</div>
+                  <p className="text-[11px] text-blue-700 font-semibold">RMOs & Nursing Staff</p>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider">Support Operations</span>
+                    <UserCheck className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <div className="text-2xl font-black text-slate-900">{supportStaff.length} Personnel</div>
+                  <p className="text-[11px] text-amber-700 font-semibold">Billing, OT, Pharmacy & Triage</p>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider">Online Appointments</span>
+                    <Calendar className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div className="text-2xl font-black text-slate-900">{appointments.length} Consultations</div>
+                  <p className="text-[11px] text-emerald-700 font-semibold">Live Web Bookings</p>
+                </div>
+              </div>
+
+              {/* Executive Fast Actions */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  Executive Fast Actions
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => {
+                      setSelectedDoctor(null);
+                      setDoctorModalOpen(true);
+                    }}
+                    className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Add Specialist Doctor</span>
+                  </button>
+                  <button
+                    onClick={() => openStaffModal("MEDICAL_STAFF")}
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <HeartHandshake className="w-3.5 h-3.5 text-teal-400" />
+                    <span>+ Register Medical Staff</span>
+                  </button>
+                  <button
+                    onClick={() => openStaffModal("SUPPORT_STAFF")}
+                    className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <UserCheck className="w-3.5 h-3.5 text-teal-600" />
+                    <span>+ Register Support Staff</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("appointments")}
+                    className="px-4 py-2 bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-800 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-teal-700" />
+                    <span>Manage Outpatient Bookings</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Recent Consultation Schedule Preview */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">Recent Consultation Schedule</h3>
+                    <p className="text-xs text-slate-500">Live feed of incoming outpatient bookings.</p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab("appointments")}
+                    className="text-xs font-bold text-teal-700 hover:underline cursor-pointer"
+                  >
+                    View All {appointments.length} Appointments →
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-wider">
+                      <tr>
+                        <th className="py-2.5 px-3">Ref ID</th>
+                        <th className="py-2.5 px-3">Patient Name</th>
+                        <th className="py-2.5 px-3">Assigned Physician</th>
+                        <th className="py-2.5 px-3">Scheduled Date</th>
+                        <th className="py-2.5 px-3">Time Slot</th>
+                        <th className="py-2.5 px-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                      {appointments.slice(0, 5).map((a) => (
+                        <tr key={a.id || a.reference_id} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-2.5 px-3 font-mono font-bold text-teal-800">{a.reference_id}</td>
+                          <td className="py-2.5 px-3 font-bold text-slate-900">{a.patient_name}</td>
+                          <td className="py-2.5 px-3 text-slate-700">{a.assigned_doctor}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-600">{a.appointment_date}</td>
+                          <td className="py-2.5 px-3 font-mono text-teal-700 font-bold">{a.time_slot}</td>
+                          <td className="py-2.5 px-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              {a.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* VIEW: ONLINE APPOINTMENTS */}
           {activeTab === "appointments" && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
               <AppointmentsView
@@ -415,7 +573,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* DOCTORS DIRECTORY */}
+          {/* VIEW: DOCTORS DIRECTORY */}
           {activeTab === "doctors" && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between">
@@ -491,7 +649,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* MEDICAL DIRECTORY (MEDICAL OFFICERS & NURSING LEADERSHIP) */}
+          {/* VIEW: MEDICAL DIRECTORY */}
           {activeTab === "medical_staff" && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between">
@@ -500,7 +658,7 @@ export default function AdminDashboardPage() {
                   <p className="text-xs text-slate-500">Resident Medical Officers (RMO), Clinical Specialists, and Nursing Superintendents.</p>
                 </div>
                 <button
-                  onClick={() => handleAddStaffMember("MEDICAL_STAFF")}
+                  onClick={() => openStaffModal("MEDICAL_STAFF")}
                   className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-xs cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -514,8 +672,9 @@ export default function AdminDashboardPage() {
                     <tr>
                       <th className="py-2.5 px-3">Credential Ref</th>
                       <th className="py-2.5 px-3">Clinician Name</th>
-                      <th className="py-2.5 px-3">Designation / Role</th>
-                      <th className="py-2.5 px-3">Contact Number</th>
+                      <th className="py-2.5 px-3">Designation / Ward</th>
+                      <th className="py-2.5 px-3">Official Login Email</th>
+                      <th className="py-2.5 px-3">Registration / Details</th>
                       <th className="py-2.5 px-3">Status</th>
                       <th className="py-2.5 px-3 text-right">Controls</th>
                     </tr>
@@ -523,8 +682,8 @@ export default function AdminDashboardPage() {
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                     {medicalStaff.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-slate-400 text-xs italic">
-                          No medical officers listed yet. Click "+ Register Medical Staff" to record clinicians.
+                        <td colSpan={7} className="py-8 text-center text-slate-400 text-xs italic">
+                          No medical officers recorded yet. Click "+ Register Medical Staff" to add clinicians.
                         </td>
                       </tr>
                     ) : (
@@ -534,6 +693,7 @@ export default function AdminDashboardPage() {
                           <td className="py-2.5 px-3 font-bold text-slate-900">{staff.col1}</td>
                           <td className="py-2.5 px-3 text-teal-700 font-semibold">{staff.col2}</td>
                           <td className="py-2.5 px-3 font-mono text-slate-600">{staff.col3}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-500 text-[11px]">{staff.col5 || "-"}</td>
                           <td className="py-2.5 px-3">
                             <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
                               {staff.status}
@@ -556,7 +716,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* SUPPORT DIRECTORY (ADMIN, BILLING, PHARMACY & OPERATIONS) */}
+          {/* VIEW: SUPPORT DIRECTORY */}
           {activeTab === "support_staff" && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between">
@@ -565,7 +725,7 @@ export default function AdminDashboardPage() {
                   <p className="text-xs text-slate-500">Reception triage, billing officers, OT technicians, and ward assistants.</p>
                 </div>
                 <button
-                  onClick={() => handleAddStaffMember("SUPPORT_STAFF")}
+                  onClick={() => openStaffModal("SUPPORT_STAFF")}
                   className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-xs cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -579,8 +739,9 @@ export default function AdminDashboardPage() {
                     <tr>
                       <th className="py-2.5 px-3">Credential Ref</th>
                       <th className="py-2.5 px-3">Staff Member</th>
-                      <th className="py-2.5 px-3">Department Role</th>
-                      <th className="py-2.5 px-3">Contact</th>
+                      <th className="py-2.5 px-3">Position / Department</th>
+                      <th className="py-2.5 px-3">Official Login Email</th>
+                      <th className="py-2.5 px-3">Staff ID / Details</th>
                       <th className="py-2.5 px-3">Status</th>
                       <th className="py-2.5 px-3 text-right">Controls</th>
                     </tr>
@@ -588,8 +749,8 @@ export default function AdminDashboardPage() {
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                     {supportStaff.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-slate-400 text-xs italic">
-                          No support staff registered yet. Click "+ Register Support Staff" to add members.
+                        <td colSpan={7} className="py-8 text-center text-slate-400 text-xs italic">
+                          No support staff recorded yet. Click "+ Register Support Staff" to add personnel.
                         </td>
                       </tr>
                     ) : (
@@ -599,6 +760,7 @@ export default function AdminDashboardPage() {
                           <td className="py-2.5 px-3 font-bold text-slate-900">{staff.col1}</td>
                           <td className="py-2.5 px-3 text-slate-700 font-semibold">{staff.col2}</td>
                           <td className="py-2.5 px-3 font-mono text-slate-600">{staff.col3}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-500 text-[11px]">{staff.col5 || "-"}</td>
                           <td className="py-2.5 px-3">
                             <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
                               {staff.status}
@@ -621,7 +783,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* PATIENT REGISTRATION VIEW */}
+          {/* VIEW: PATIENT REGISTRATION */}
           {activeTab === "registration" && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
               <RegistrationView
@@ -639,7 +801,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* PRESCRIPTION DISPENSARY */}
+          {/* VIEW: PRESCRIPTION DISPENSARY */}
           {activeTab === "dispensary" && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
               <PrescriptionDispensary
@@ -651,7 +813,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* CERTIFICATES */}
+          {/* VIEW: CERTIFICATES */}
           {activeTab === "certificates" && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
               {React.createElement(CertificatesView as any, {
@@ -670,6 +832,16 @@ export default function AdminDashboardPage() {
           doctor={selectedDoctor}
           onClose={() => setDoctorModalOpen(false)}
           onSaved={loadData}
+        />
+      )}
+
+      {/* Medical & Support Staff Registration Modal */}
+      {staffModalOpen && (
+        <StaffRegistrationModal
+          isOpen={staffModalOpen}
+          type={staffModalType}
+          onClose={() => setStaffModalOpen(false)}
+          onSuccess={loadData}
         />
       )}
     </div>
