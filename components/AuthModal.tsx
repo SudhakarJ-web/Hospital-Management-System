@@ -22,6 +22,11 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
 
   if (!isOpen) return null;
 
+  const switchTab = (newRole: "admin" | "doctor" | "support" | "medical" | "patient") => {
+    setRole(newRole);
+    setErrorMsg(null);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -41,7 +46,6 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
           setErrorMsg("Invalid Administrator credentials.");
         }
       } else if (role === "doctor") {
-        // Authenticate directly against live database doctors
         const doctors = await getSharedDoctors();
         const matched = doctors.find(
           (d) => d.email.toLowerCase() === cleanEmail && d.password === cleanPassword
@@ -57,35 +61,65 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
           setErrorMsg("Invalid Doctor email or password.");
         }
       } else if (role === "medical") {
-        // Authenticate against database records provisioned by Admin
+        // Query MEDICAL_STAFF first
         const medicalRecords = await getLiveModuleRecords("MEDICAL_STAFF");
-        const matchedStaff = medicalRecords.find(
-          (s) => s.col3?.toLowerCase() === cleanEmail && s.col4 === cleanPassword
+        const matchedMedical = medicalRecords.find(
+          (s) => s.col3?.trim().toLowerCase() === cleanEmail && s.col4?.trim() === cleanPassword
         );
 
-        if (matchedStaff || (cleanEmail === "medical@gavanehospital.in" && cleanPassword === "Medical@2026")) {
+        if (matchedMedical || (cleanEmail === "medical@gavanehospital.in" && cleanPassword === "Medical@2026")) {
           sessionStorage.setItem("staff_email", cleanEmail);
           sessionStorage.setItem("staff_role", "medical");
           router.push("/dashboard/medical");
           onClose();
-        } else {
-          setErrorMsg("Invalid Medical Officer credentials or profile not authorized by Admin.");
+          return;
         }
-      } else if (role === "support") {
-        // Authenticate against database records provisioned by Admin
+
+        // Smart fallback: Check if user is registered in Support Staff instead
         const supportRecords = await getLiveModuleRecords("SUPPORT_STAFF");
-        const matchedStaff = supportRecords.find(
-          (s) => s.col3?.toLowerCase() === cleanEmail && s.col4 === cleanPassword
+        const matchedSupport = supportRecords.find(
+          (s) => s.col3?.trim().toLowerCase() === cleanEmail && s.col4?.trim() === cleanPassword
         );
 
-        if (matchedStaff || (cleanEmail === "support@gavanehospital.in" && cleanPassword === "Support@2026")) {
+        if (matchedSupport) {
           sessionStorage.setItem("staff_email", cleanEmail);
           sessionStorage.setItem("staff_role", "support");
           router.push("/dashboard/support");
           onClose();
-        } else {
-          setErrorMsg("Invalid Support Staff credentials or profile not authorized by Admin.");
+          return;
         }
+
+        setErrorMsg("Invalid Medical Officer credentials or profile not authorized by Admin.");
+      } else if (role === "support") {
+        // Query SUPPORT_STAFF first
+        const supportRecords = await getLiveModuleRecords("SUPPORT_STAFF");
+        const matchedSupport = supportRecords.find(
+          (s) => s.col3?.trim().toLowerCase() === cleanEmail && s.col4?.trim() === cleanPassword
+        );
+
+        if (matchedSupport || (cleanEmail === "support@gavanehospital.in" && cleanPassword === "Support@2026")) {
+          sessionStorage.setItem("staff_email", cleanEmail);
+          sessionStorage.setItem("staff_role", "support");
+          router.push("/dashboard/support");
+          onClose();
+          return;
+        }
+
+        // Smart fallback: Check if user is registered in Medical Staff instead
+        const medicalRecords = await getLiveModuleRecords("MEDICAL_STAFF");
+        const matchedMedical = medicalRecords.find(
+          (s) => s.col3?.trim().toLowerCase() === cleanEmail && s.col4?.trim() === cleanPassword
+        );
+
+        if (matchedMedical) {
+          sessionStorage.setItem("staff_email", cleanEmail);
+          sessionStorage.setItem("staff_role", "medical");
+          router.push("/dashboard/medical");
+          onClose();
+          return;
+        }
+
+        setErrorMsg("Invalid Support Staff credentials or profile not authorized by Admin.");
       } else if (role === "patient") {
         router.push(`/dashboard/patient?phone=${encodeURIComponent(cleanEmail)}`);
         onClose();
@@ -113,7 +147,7 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
             <Lock className="w-6 h-6" />
           </div>
           <h2 className="text-xl font-black text-slate-900 tracking-tight mt-2">
-            {role === "patient" ? "Patient Access Gateway" : "Staff Access Gateway"}
+            Staff Access Gateway
           </h2>
           <p className="text-xs text-slate-500">
             Gavane Hospital & Research Centre Network
@@ -124,9 +158,11 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
         <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100 rounded-2xl text-[11px] font-bold">
           <button
             type="button"
-            onClick={() => { setRole("admin"); setErrorMsg(null); }}
+            onClick={() => switchTab("admin")}
             className={`py-2 rounded-xl transition-all flex items-center justify-center space-x-1 cursor-pointer ${
-              role === "admin" ? "bg-white text-teal-800 shadow-2xs font-extrabold" : "text-slate-500 hover:text-slate-800"
+              role === "admin"
+                ? "bg-white text-teal-800 shadow-2xs font-extrabold"
+                : "text-slate-500 hover:text-slate-800"
             }`}
           >
             <Shield className="w-3 h-3" />
@@ -134,9 +170,11 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
           </button>
           <button
             type="button"
-            onClick={() => { setRole("doctor"); setErrorMsg(null); }}
+            onClick={() => switchTab("doctor")}
             className={`py-2 rounded-xl transition-all flex items-center justify-center space-x-1 cursor-pointer ${
-              role === "doctor" ? "bg-white text-teal-800 shadow-2xs font-extrabold" : "text-slate-500 hover:text-slate-800"
+              role === "doctor"
+                ? "bg-white text-teal-800 shadow-2xs font-extrabold"
+                : "text-slate-500 hover:text-slate-800"
             }`}
           >
             <Stethoscope className="w-3 h-3" />
@@ -144,9 +182,11 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
           </button>
           <button
             type="button"
-            onClick={() => { setRole("medical"); setErrorMsg(null); }}
+            onClick={() => switchTab("medical")}
             className={`py-2 rounded-xl transition-all flex items-center justify-center space-x-1 cursor-pointer ${
-              role === "medical" ? "bg-white text-teal-800 shadow-2xs font-extrabold" : "text-slate-500 hover:text-slate-800"
+              role === "medical"
+                ? "bg-white text-teal-800 shadow-2xs font-extrabold"
+                : "text-slate-500 hover:text-slate-800"
             }`}
           >
             <HeartHandshake className="w-3 h-3" />
@@ -154,9 +194,11 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
           </button>
           <button
             type="button"
-            onClick={() => { setRole("support"); setErrorMsg(null); }}
+            onClick={() => switchTab("support")}
             className={`py-2 rounded-xl transition-all flex items-center justify-center space-x-1 cursor-pointer ${
-              role === "support" ? "bg-white text-teal-800 shadow-2xs font-extrabold" : "text-slate-500 hover:text-slate-800"
+              role === "support"
+                ? "bg-white text-teal-800 shadow-2xs font-extrabold"
+                : "text-slate-500 hover:text-slate-800"
             }`}
           >
             <UserPlus className="w-3 h-3" />
@@ -173,20 +215,18 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
         <form onSubmit={handleLogin} className="space-y-3.5">
           <div>
             <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
-              {role === "patient" ? "Registered Mobile Number *" : "Official Portal Email *"}
+              Official Portal Email *
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
               <input
-                type={role === "patient" ? "tel" : "email"}
+                type="email"
                 required
                 placeholder={
-                  role === "patient"
-                    ? "+91 98220 12345"
-                    : role === "admin"
+                  role === "admin"
                     ? "admin@gavanehospital.in"
                     : role === "medical"
-                    ? "medical@gavanehospital.in"
+                    ? "rmo@gavanehospital.in"
                     : role === "support"
                     ? "support@gavanehospital.in"
                     : "doctor@gavanehospital.in"
