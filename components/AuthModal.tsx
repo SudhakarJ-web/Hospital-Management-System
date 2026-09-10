@@ -2,8 +2,8 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 import { getSharedDoctors } from "@/lib/sync/doctorsSync";
-import { getLiveModuleRecords } from "@/lib/sync/hospitalMasterSync";
 import { X, Lock, Mail, Shield, Stethoscope, HeartHandshake, UserPlus } from "lucide-react";
 
 interface AuthModalProps {
@@ -61,10 +61,14 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
           setErrorMsg("Invalid Doctor email or password.");
         }
       } else if (role === "medical") {
-        // Query MEDICAL_STAFF first
-        const medicalRecords = await getLiveModuleRecords("MEDICAL_STAFF");
-        const matchedMedical = medicalRecords.find(
-          (s) => s.col3?.trim().toLowerCase() === cleanEmail && s.col4?.trim() === cleanPassword
+        // 1. Query staff_members for Medical Staff
+        const { data: medicalList } = await supabase
+          .from("staff_members")
+          .select("*")
+          .eq("role_type", "MEDICAL_STAFF");
+
+        const matchedMedical = medicalList?.find(
+          (s) => s.email?.trim().toLowerCase() === cleanEmail && s.password?.trim() === cleanPassword
         );
 
         if (matchedMedical || (cleanEmail === "medical@gavanehospital.in" && cleanPassword === "Medical@2026")) {
@@ -75,10 +79,14 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
           return;
         }
 
-        // Smart fallback: Check if user is registered in Support Staff instead
-        const supportRecords = await getLiveModuleRecords("SUPPORT_STAFF");
-        const matchedSupport = supportRecords.find(
-          (s) => s.col3?.trim().toLowerCase() === cleanEmail && s.col4?.trim() === cleanPassword
+        // 2. Smart fallback: Auto-detect if user belongs to Support Staff
+        const { data: supportList } = await supabase
+          .from("staff_members")
+          .select("*")
+          .eq("role_type", "SUPPORT_STAFF");
+
+        const matchedSupport = supportList?.find(
+          (s) => s.email?.trim().toLowerCase() === cleanEmail && s.password?.trim() === cleanPassword
         );
 
         if (matchedSupport) {
@@ -91,10 +99,14 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
 
         setErrorMsg("Invalid Medical Officer credentials or profile not authorized by Admin.");
       } else if (role === "support") {
-        // Query SUPPORT_STAFF first
-        const supportRecords = await getLiveModuleRecords("SUPPORT_STAFF");
-        const matchedSupport = supportRecords.find(
-          (s) => s.col3?.trim().toLowerCase() === cleanEmail && s.col4?.trim() === cleanPassword
+        // 1. Query staff_members for Support Staff
+        const { data: supportList } = await supabase
+          .from("staff_members")
+          .select("*")
+          .eq("role_type", "SUPPORT_STAFF");
+
+        const matchedSupport = supportList?.find(
+          (s) => s.email?.trim().toLowerCase() === cleanEmail && s.password?.trim() === cleanPassword
         );
 
         if (matchedSupport || (cleanEmail === "support@gavanehospital.in" && cleanPassword === "Support@2026")) {
@@ -105,10 +117,14 @@ export default function AuthModal({ isOpen, onClose, defaultRole = "doctor" }: A
           return;
         }
 
-        // Smart fallback: Check if user is registered in Medical Staff instead
-        const medicalRecords = await getLiveModuleRecords("MEDICAL_STAFF");
-        const matchedMedical = medicalRecords.find(
-          (s) => s.col3?.trim().toLowerCase() === cleanEmail && s.col4?.trim() === cleanPassword
+        // 2. Smart fallback: Auto-detect if user belongs to Medical Staff
+        const { data: medicalList } = await supabase
+          .from("staff_members")
+          .select("*")
+          .eq("role_type", "MEDICAL_STAFF");
+
+        const matchedMedical = medicalList?.find(
+          (s) => s.email?.trim().toLowerCase() === cleanEmail && s.password?.trim() === cleanPassword
         );
 
         if (matchedMedical) {
